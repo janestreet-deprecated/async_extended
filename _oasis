@@ -90,14 +90,6 @@ Library async_extended
                       pa_test,
                       sexplib
 
-Executable find
-  Path:               examples
-  MainIs:             find.ml
-  CompiledObject:     best
-  Build:              false
-  Install:            false
-  BuildDepends:       pcre, async_extended
-
 Executable pause
   Path:               examples
   MainIs:             pause.ml

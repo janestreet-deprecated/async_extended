@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: 35c91c18be8494d58c322e6f5bc5e2d9) *)
+(* DO NOT EDIT (digest: 8b7064f5f9dff1573fa4a0ccb13dda13) *)
 
 This is the INSTALL file for the async_extended distribution.
 
@@ -25,7 +25,6 @@ In order to compile this package, you will need:
 * pa_pipebang for library async_extended
 * pa_test for library async_extended
 * sexplib for library async_extended
-* pcre for executable find
 
 Installing
 ==========

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 424679c7ff59137c14e392075b7587f6)
+# DO NOT EDIT (digest: 8f297c692ce3193fdfec42fca3d53618)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -70,29 +70,6 @@
 <lib/*.ml{,i}>: package(sexplib.syntax)
 <lib/*.ml{,i}>: package(textutils)
 <lib/*.ml{,i}>: package(threads)
-# Executable find
-<examples/find.{native,byte}>: package(async)
-<examples/find.{native,byte}>: package(bin_prot)
-<examples/find.{native,byte}>: package(bin_prot.syntax)
-<examples/find.{native,byte}>: package(camlzip)
-<examples/find.{native,byte}>: package(core)
-<examples/find.{native,byte}>: package(core_extended)
-<examples/find.{native,byte}>: package(fieldslib)
-<examples/find.{native,byte}>: package(fieldslib.syntax)
-<examples/find.{native,byte}>: package(herelib)
-<examples/find.{native,byte}>: package(herelib.syntax)
-<examples/find.{native,byte}>: package(pa_ounit)
-<examples/find.{native,byte}>: package(pa_ounit.syntax)
-<examples/find.{native,byte}>: package(pa_pipebang)
-<examples/find.{native,byte}>: package(pa_test)
-<examples/find.{native,byte}>: package(pa_test.syntax)
-<examples/find.{native,byte}>: package(pcre)
-<examples/find.{native,byte}>: package(sexplib)
-<examples/find.{native,byte}>: package(sexplib.syntax)
-<examples/find.{native,byte}>: package(textutils)
-<examples/find.{native,byte}>: package(threads)
-<examples/find.{native,byte}>: use_async_extended
-<examples/*.ml{,i}>: package(pcre)
 # Executable pause
 <examples/pause.{native,byte}>: package(async)
 <examples/pause.{native,byte}>: package(bin_prot)

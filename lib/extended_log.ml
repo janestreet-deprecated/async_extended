@@ -65,19 +65,6 @@ module Syslog = struct
   ;;
 
   let openlog () =
-    (* 2012-09-29 mbac:
-       (a) It's tempting to make this lazy, but there's no need.
-       openlog will re-open the descriptor if necessary, which you want in case the
-       pid changes.  And it's internally lazy anyway.  By default, it won't open the
-       descriptor until the first call to syslog.
-
-       (b) it's tempting to pass [~id:Sys.argv.(0)], but this is redundant
-       (and leaks memory).  libc openlog has a special case for ident if it's
-       unspecified and defaults to argv[0].  This is standard behavior.
-
-       (c) calling Syslog.closelog is almost useless.  The descriptor is closed
-       on termination and if you try to force it early, subsequent calls to
-       [Syslog.syslog] will simply re-open it anyway. *)
     Syslog.openlog ~options:[ Syslog.Open_option.PID; Syslog.Open_option.CONS ] ()
   ;;
 

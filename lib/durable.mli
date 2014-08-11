@@ -12,11 +12,6 @@ type 'a t
    [is_broken] tests whether the current 'a value can be used. It should return true when
    you want the Durable to attempt to rebuild or recreate the 'a.
 
-   if [create_now] is true, this function will call [to_create] immediately, and the
-   function as a whole will return an Error if [to_create] returns an Error. If
-   [create_now] is false, this function will be determined immediately and will always
-   return Ok.
-
    [to_rebuild] Is called on the broken 'a. It should return a "fixed" 'a.
 
    When the function [with_] below is called, it uses [is_broken] to test if the current

@@ -197,7 +197,7 @@ let make_emit_field ~strip current_row field =
 let set_headers header_index headers =
   List.iteri headers ~f:(fun i h ->
     match Hashtbl.find header_index h with
-    | None -> Hashtbl.replace header_index ~key:h ~data:i
+    | None -> Hashtbl.set header_index ~key:h ~data:i
     | Some other_i ->
       failwithf "header %s duplicated at position %i and %i" h other_i i ())
 ;;
@@ -228,7 +228,7 @@ let make_emit_row current_row row_queue header ~lineno =
             failwithf "The required header '%s' was not found in '%s' (lineno=%d)"
               must_exist (String.concat ~sep:"," headers) (!lineno) ()
           | Some (i, _) ->
-            Hashtbl.replace header_index ~key:must_exist ~data:i)
+            Hashtbl.set header_index ~key:must_exist ~data:i)
       | `Replace _new_headers -> ()  (* already set above *)
       | `Transform f ->
         set_headers header_index (f (Queue.to_list current_row))

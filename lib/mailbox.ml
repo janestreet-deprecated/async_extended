@@ -48,6 +48,8 @@ let create_gen ?to_sexp iter =
   let t = { data = []; new_data = Ivar.create (); msg_to_sexp = to_sexp } in
   don't_wait_for
     (iter (fun m ->
+       (* Be careful when changing this - we expect that at any given point,
+          t.data is ordered from newest to oldest. *)
        t.data <- m :: t.data;
        Ivar.fill t.new_data ();
        t.new_data <- Ivar.create ();
@@ -96,20 +98,70 @@ end
 
 exception Timed_out_waiting_for of Timed_out_waiting_for.t with sexp
 
-let receive ?debug ?(timeout = Clock.after (sec 10.)) t
+(* There are now two modes of operation:  swallow or not.  swallow means
+   that every element prior to the last element found that satisfies our
+   postcondition will be thrown away.  This is useful for implementing
+   ordering guarantees across successive calls to [receive].
+
+   To accomplish swallow mode, on each loop iteration we check elements
+   from newest to oldest, because once we find an element that satisfies
+   the filter we can throw away everything preceding it.  Everything before
+   that will be replaced in its original order.
+
+   If [swallow] is set to false, we can't throw anything away.  In this
+   case, on each iteration we store the non-filter-passing elements in
+   their original order; once the postcondition passes, we can then
+   reconstruct the non-filter-passing mailbox data in its entirety.
+*)
+let receive ?debug ?(timeout = Clock.after (sec 10.)) ?(swallow=false) t
       ~filter:{Filter. name = filter_name; select = filter} ~postcond =
+  let push x l = l := x :: !l in
   Deferred.create (fun ivar ->
+    (* Accumulators for items that pass the filter (reses) and
+       those that don't (remainses).  On each iteration we push
+       a list of everything we've found this time, so these are
+       lists of lists.  Once we're done, if [swallow] is false,
+       we can put everything from [remainses] back into the
+       mailbox in its original order. *)
+    let reses = ref [] in
+    let remainses = ref [] in
     let rec loop () =
-      let (res, remains) =
-        List.partition_map t.data ~f:(fun m ->
+      let found_one = ref false in
+      (* From newest to oldest, check each element.  Once we find something
+         that passes the filter, if [swallow] is true then we can
+         throw away all further non-passing elemnents. *)
+      let res, remains =
+        List.fold ~init:([], []) t.data ~f:(fun (res, remains) m ->
           match filter m with
-          | None -> `Snd m
-          | Some x -> `Fst x)
+          | None ->
+            if swallow && !found_one then
+              res, remains
+            else
+              res, m::remains
+          | Some x ->
+            found_one := true;
+            x::res, remains)
       in
-      if postcond res then begin
-        t.data <- remains;
-        Ivar.fill ivar (List.rev res)
+      push res reses;
+      (* Arrange all of the elements in the lists of [reses] in
+         their original order, in case [postcond] cares about that *)
+      let results = List.concat (List.rev !reses) in
+
+      (* If we're swallowing and we found any matches this iteration,
+         clear out any previous [remains] *)
+      if (swallow && res <> []) then
+        remainses := [];
+
+      (* We're done, so restore the proper state of the mailbox.  This iteration's
+          [remains] need to be included regardless of [swallow]. *)
+      push (List.rev remains) remainses;
+      if postcond results then begin
+        (* This will give us every element that didn't pass the filter, respecting
+           [swallow], in the order that they were received. *)
+        t.data <- List.concat (List.rev !remainses);
+        Ivar.fill ivar results;
       end else begin
+        t.data <- [];
         upon
           (choose [
              choice timeout (fun () -> `Timeout);
@@ -117,6 +169,7 @@ let receive ?debug ?(timeout = Clock.after (sec 10.)) t
            ])
           (function
             | `Timeout ->
+              t.data <- List.concat (List.rev !remainses);
               raise (
                 Timed_out_waiting_for
                   { Timed_out_waiting_for.
@@ -141,8 +194,8 @@ end
 
 exception Matched_more_than_expected of Matched_more_than_expected.t with sexp
 
-let many ?debug ?timeout t n f =
-  receive ?debug ?timeout t ~filter:f ~postcond:(fun l ->
+let many ?debug ?timeout ?swallow t n f =
+  receive ?debug ?timeout ?swallow t ~filter:f ~postcond:(fun l ->
     let n_received = List.length l in
     if n_received > n then
       raise (
@@ -157,14 +210,14 @@ let many ?debug ?timeout t n f =
     else
       n_received = n)
 
-let two ?debug ?timeout t f =
-  many ?debug ?timeout t 2 f
+let two ?debug ?timeout ?swallow t f =
+  many ?debug ?timeout ?swallow t 2 f
   >>| function
     | [a; b] -> (a, b)
     | _ -> failwith "mailbox.ml bug"
 
-let one ?debug ?timeout t f =
-  many ?debug ?timeout t 1 f >>| List.hd_exn
+let one ?debug ?timeout ?swallow t f =
+  many ?debug ?timeout ?swallow t 1 f >>| List.hd_exn
 
 let not_empty ?debug ?timeout t f =
   receive ?debug ?timeout t ~filter:f ~postcond:(Fn.non List.is_empty)
@@ -172,10 +225,18 @@ let not_empty ?debug ?timeout t f =
 let peek t {Filter.select = f; _} =
   List.map t.data ~f |! List.filter_map ~f:Fn.id |! List.rev
 
+let filter t {Filter.select = f; _} =
+  t.data <- List.filter t.data ~f:(fun x -> Option.is_none (f x))
+
 let zero ?(debug = "") t f =
   match peek t f with
   | [] -> ()
-  | _ -> failwithf "Mailbox: Not Zero. Filter '%s'. Debug: '%s'." f.Filter.name debug ()
+  | _ -> failwithf
+           "Mailbox: Not Zero. Filter '%s'. Debug: '%s'.\n%s"
+           f.Filter.name
+           debug
+           (describe t)
+           ()
 
 let clear t =
   t.data <- []
@@ -186,3 +247,83 @@ let check_clear t =
   else
     Or_error.tag (Or_error.error_string (describe t)) "Unconsumed msgs"
 
+TEST_MODULE = struct
+
+  module Dummy = struct
+    type nonrec 'a t =
+      { mailbox : 'a t;
+        writer : 'a Pipe.Writer.t;
+        mutable ctr : int;
+      }
+
+    let write t amt =
+      let rec aux n =
+        if n > amt then
+          Deferred.unit
+        else
+          Pipe.write t.writer (t.ctr + n)
+          >>= fun () -> aux (n+1)
+      in
+      aux 1
+      >>| fun () ->
+      t.ctr <- t.ctr + amt
+
+    let create () =
+      let reader, writer = Pipe.create () in
+      { mailbox = of_pipe reader;
+        writer;
+        ctr = 0;
+      }
+  end
+
+
+  let filter n =
+    { Filter.
+      name = sprintf "Next: %d" n;
+      select = fun x -> if x = n then Some x else None;
+    }
+
+  let loop ~swallow n =
+    let dummy = Dummy.create () in
+    let rec aux ct =
+      if ct = n then begin
+        Or_error.ok_exn (check_clear dummy.mailbox);
+        Deferred.unit
+      end else begin
+        Dummy.write dummy 1
+        >>= fun () ->
+        one ~swallow dummy.mailbox (filter ct)
+        >>= fun _ ->
+        aux (ct+1)
+      end
+    in
+    aux 1
+
+  TEST_UNIT =
+    Thread_safe.block_on_async_exn (fun () -> loop 100 ~swallow:true);
+
+  TEST_UNIT =
+    Thread_safe.block_on_async_exn (fun () -> loop 100 ~swallow:false);
+
+  TEST_UNIT =
+    Thread_safe.block_on_async_exn (fun () ->
+      let dummy = Dummy.create () in
+      Dummy.write dummy 3
+      >>= fun () ->
+      many ~swallow:true dummy.mailbox 0 (filter 4)
+      >>= fun _ ->
+      many ~swallow:false dummy.mailbox 0 (filter 4)
+      >>= fun _ ->
+      one ~swallow:false dummy.mailbox (filter 3)
+      >>= fun n ->
+      assert (n = 3);
+      one ~swallow:true  dummy.mailbox (filter 2)
+      >>= fun n ->
+      assert (n = 2);
+      Monitor.try_with (fun () -> one ~swallow:true dummy.mailbox (filter 1))
+      >>| fun res ->
+      match res with
+      | Ok _ -> assert false
+      | _ -> Or_error.ok_exn (check_clear dummy.mailbox))
+
+end

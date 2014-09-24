@@ -70,21 +70,21 @@ module Row : sig
   val iter : t -> f:(header:string -> data:string -> unit) -> unit
 end
 
-(**
-  If strip is true (default is false) then spaces will be stripped from the
-  beginning and end of fields.
+(** If strip is true (default is false) then spaces will be stripped from the beginning
+    and end of fields.
 
-  If [skip_lines] is given then that number of lines
-  will be read and discarded from the top of the file or Reader.t given.
+    If [skip_lines] is given then that number of lines will be read and discarded from the
+    top of the file or Reader.t given.
 
-  If [on_parse_error] is `Raise any lines that fail to parse will raise an exception.  If
-  `Handle is given the offending line will be passed to the function given, which may then
-  indicate that processing should continue or finish.
+    If [on_parse_error] is `Raise any lines that fail to parse will raise an exception.
+    If `Handle is given the offending line will be passed to the function given, which may
+    then indicate that processing should continue or finish.
 *)
 type ('a,'b) reader =
        ?strip:bool
     -> ?skip_lines:int
-    -> ?on_parse_error:[`Raise | `Handle of (string Queue.t -> exn -> [`Continue | `Finish])]
+    -> ?on_parse_error:[`Raise
+                       | `Handle of (string Queue.t -> exn -> [`Continue | `Finish])]
     -> header:'a
     -> 'b
 
@@ -97,7 +97,8 @@ module Csv : sig
 
   (** [create_reader ?strip ~header filename] same as of_reader, but creates the reader
       for you *)
-  val create_reader : (Header.t, ?sep:char -> string -> Row.t Pipe.Reader.t Deferred.t) reader
+  val create_reader :
+    (Header.t, ?sep:char -> string -> Row.t Pipe.Reader.t Deferred.t) reader
 
   val of_writer : ?sep:char -> Writer.t -> string list Pipe.Writer.t
   val create_writer : ?sep:char -> string -> string list Pipe.Writer.t Deferred.t
@@ -111,17 +112,22 @@ module Positional : sig
   type header = (string * int * int) list
 
   (** All following funtions return Error if column ranges overlap. *)
-  val of_reader : (header, ?strict:bool -> Reader.t -> Row.t Pipe.Reader.t Or_error.t) reader
-  val create_reader : (header, ?strict:bool -> string -> Row.t Pipe.Reader.t Deferred.Or_error.t) reader
+  val of_reader :
+    (header, ?strict:bool -> Reader.t -> Row.t Pipe.Reader.t Or_error.t) reader
+  val create_reader :
+    (header, ?strict:bool -> string -> Row.t Pipe.Reader.t Deferred.Or_error.t) reader
 
-  val of_writer : Writer.t -> ?strict:bool -> header -> string list Pipe.Writer.t Or_error.t
-  val create_writer : string -> ?strict:bool -> header -> string list Pipe.Writer.t Deferred.Or_error.t
+  val of_writer :
+    Writer.t -> ?strict:bool -> header -> string list Pipe.Writer.t Or_error.t
+  val create_writer :
+    string -> ?strict:bool -> header -> string list Pipe.Writer.t Deferred.Or_error.t
 end
 
 (** [of_reader ?quote ?strip ?skip_lines ~sep ~header r] returns a row pipe based on data
     read from the provided reader.  [sep] is used as the separator between fields, and is
     assumed to be escaped with \ unless [quote] is given.  *)
-val of_reader : (Header.t, ?quote:char -> sep:char -> Reader.t -> Row.t Pipe.Reader.t) reader
+val of_reader :
+  (Header.t, ?quote:char -> sep:char -> Reader.t -> Row.t Pipe.Reader.t) reader
 
 (** [create_reader ?strip ?skip_lines ~header filename] same as of_reader, but creates
     the reader for you *)

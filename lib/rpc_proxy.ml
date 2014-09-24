@@ -2,7 +2,7 @@ open Core.Std
 open Async.Std
 
 (* This is just to improve errors *)
-let barf_on_closed_connection connection =
+let raise_on_closed_connection connection =
   if Rpc.Connection.is_closed connection then
     failwith "rpc proxy connection closed"
 
@@ -10,7 +10,7 @@ let rpc_proxy :
   'q 'r. ('q, 'r) Rpc.Rpc.t -> Rpc.Connection.t Rpc.Implementation.t
   = fun rpc ->
     Rpc.Rpc.implement rpc (fun connection query ->
-      barf_on_closed_connection connection;
+      raise_on_closed_connection connection;
       Rpc.Rpc.dispatch_exn rpc connection query)
 
 let pipe_proxy :
@@ -18,7 +18,7 @@ let pipe_proxy :
   = fun rpc ->
     Rpc.Pipe_rpc.implement rpc
       (fun connection query ~aborted ->
-         barf_on_closed_connection connection;
+         raise_on_closed_connection connection;
          Rpc.Pipe_rpc.dispatch rpc connection query
          >>= function
          | Error error -> Error.raise error
@@ -37,7 +37,7 @@ let state_proxy :
   = fun rpc ->
     Rpc.State_rpc.implement rpc
       (fun connection query ~aborted ->
-         barf_on_closed_connection connection;
+         raise_on_closed_connection connection;
          Rpc.State_rpc.dispatch rpc connection query ~update:(fun s _ -> s)
          >>= function
          | Error error -> Error.raise error

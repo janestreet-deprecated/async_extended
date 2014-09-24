@@ -42,10 +42,20 @@ val of_pipe :
 (** [receive t f] apply [f] to each message in the mailbox, return the list of messages
     for which [f] returned [Some x].  If [f] does not return [Some x] for any available
     messages then wait until one arrives for which it does.  If at any point [timeout]
-    becomes determined raise an exception. *)
+    becomes determined raise an exception.
+
+    If this returns successfully, the remaining data in the mailbox will be:
+
+    - the list of messages that did not pass the filter, in the order received,
+      iff [swallow] is false.
+    - the list of messages that did not pass the filter AND arrived after the
+      last message that did pass the filter, in the order received, iff
+      [swallow] is true OR if no messages passed the filter.
+*)
 val receive
   :  ?debug:string
   -> ?timeout:unit Deferred.t
+  -> ?swallow:bool
   -> 'a t
   -> filter: ('a, 'b) Filter.t
   -> postcond:('b list -> bool)
@@ -61,6 +71,7 @@ val zero : ?debug:string -> 'a t -> ('a, 'b) Filter.t -> unit
 val one
   :  ?debug:string
   -> ?timeout:unit Deferred.t
+  -> ?swallow:bool
   -> 'a t
   -> ('a, 'b) Filter.t
   -> 'b Deferred.t
@@ -69,14 +80,16 @@ val one
 val two
   :  ?debug:string
   -> ?timeout:unit Deferred.t
+  -> ?swallow:bool
   -> 'a t
   -> ('a, 'b) Filter.t
   -> ('b * 'b) Deferred.t
 
-(** [many t n f] run receive, asserting that there are exactly [n] matching messages *)
+(** [many t n f] run receive, asserting that there are exactly [n] matching messages. *)
 val many
   :  ?debug:string
   -> ?timeout:unit Deferred.t
+  -> ?swallow:bool
   -> 'a t
   -> int
   -> ('a, 'b) Filter.t
@@ -99,3 +112,8 @@ val clear : _ t -> unit
 (** [check_clear t] - Ok if the mailbox is empty, descriptive error if the mailbox
     has any messages *)
 val check_clear : _ t -> unit Or_error.t
+
+(** [filter t f] removes all elements currently in [t] that satisfy [f].
+    Future arrivals are unaffected.
+*)
+val filter : 'a t -> ('a, _) Filter.t -> unit

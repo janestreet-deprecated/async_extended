@@ -76,7 +76,7 @@ module Command = struct
           | Error (`Duplicate_implementations _) -> return `Failure
           | Ok implementations ->
             Rpc.Connection.server_with_close stdin stdout ~implementations
-              ~connection_state:() ~on_handshake_error:`Raise
+              ~connection_state:(fun _ -> ()) ~on_handshake_error:`Raise
             >>| fun () ->
             `Success
         end
@@ -159,7 +159,7 @@ module Connection = struct
         Rpc.Connection.with_close
           stdout
           stdin
-          ~connection_state:()
+          ~connection_state:(fun _ -> ())
           ~on_handshake_error:`Raise
           ~dispatch_queries)
   ;;
@@ -170,7 +170,7 @@ module Connection = struct
         Rpc.Connection.create
           stdout
           stdin
-          ~connection_state:()
+          ~connection_state:(fun _ -> ())
         >>| Or_error.of_exn_result)
   ;;
 end

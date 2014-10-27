@@ -100,6 +100,14 @@ module Row = struct
 
   let nth_exn t i = t.data.(i)
 
+  let nth_conv_exn t i here conv =
+    try conv (nth_exn t i) with
+    | exn ->
+      Error.failwithp here "failed to parse"
+        (`nth i, `row t, `exn exn)
+        <:sexp_of< [`nth of int] * [`row of t] * [`exn of Exn.t] >>
+  ;;
+
   (*
   let set_exn t ~header value =
     let i = index_exn t header in

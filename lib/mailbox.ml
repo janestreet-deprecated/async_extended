@@ -13,6 +13,8 @@ module Filter = struct
     select : 'a -> 'b option;
   }
 
+  let create name select = { name; select }
+
   (* To be ignored when composing filter names *)
   let synthetic = "<synthetic>"
 
@@ -42,6 +44,10 @@ module Filter = struct
   let ( >>> ) f1 f2 =
     { name = compose_name ~sep:">>>" f1.name f2.name;
       select = fun x -> Option.find_map (f1.select x) ~f:f2.select}
+
+  let to_predicate t =
+    fun x -> Option.is_some (t.select x)
+
 end
 
 let create_gen ?to_sexp iter =
@@ -106,25 +112,10 @@ exception Timed_out_waiting_for of Timed_out_waiting_for.t with sexp
    To accomplish swallow mode, on each loop iteration we check elements
    from newest to oldest, because once we find an element that satisfies
    the filter we can throw away everything preceding it.  Everything before
-   that will be replaced in its original order.
-
-   If [swallow] is set to false, we can't throw anything away.  In this
-   case, on each iteration we store the non-filter-passing elements in
-   their original order; once the postcondition passes, we can then
-   reconstruct the non-filter-passing mailbox data in its entirety.
-*)
+   that will be replaced in its original order. *)
 let receive ?debug ?(timeout = Clock.after (sec 10.)) ?(swallow=false) t
       ~filter:{Filter. name = filter_name; select = filter} ~postcond =
-  let push x l = l := x :: !l in
   Deferred.create (fun ivar ->
-    (* Accumulators for items that pass the filter (reses) and
-       those that don't (remainses).  On each iteration we push
-       a list of everything we've found this time, so these are
-       lists of lists.  Once we're done, if [swallow] is false,
-       we can put everything from [remainses] back into the
-       mailbox in its original order. *)
-    let reses = ref [] in
-    let remainses = ref [] in
     let rec loop () =
       let found_one = ref false in
       (* From newest to oldest, check each element.  Once we find something
@@ -142,26 +133,16 @@ let receive ?debug ?(timeout = Clock.after (sec 10.)) ?(swallow=false) t
             found_one := true;
             x::res, remains)
       in
-      push res reses;
-      (* Arrange all of the elements in the lists of [reses] in
-         their original order, in case [postcond] cares about that *)
-      let results = List.concat (List.rev !reses) in
+      (* Arrange all of the elements, newest to oldest, in case [postcond] cares
+         about the order. *)
+      let results = List.rev res in
 
-      (* If we're swallowing and we found any matches this iteration,
-         clear out any previous [remains] *)
-      if (swallow && res <> []) then
-        remainses := [];
-
-      (* We're done, so restore the proper state of the mailbox.  This iteration's
-          [remains] need to be included regardless of [swallow]. *)
-      push (List.rev remains) remainses;
       if postcond results then begin
         (* This will give us every element that didn't pass the filter, respecting
            [swallow], in the order that they were received. *)
-        t.data <- List.concat (List.rev !remainses);
+        t.data <- (List.rev remains);
         Ivar.fill ivar results;
       end else begin
-        t.data <- [];
         upon
           (choose [
              choice timeout (fun () -> `Timeout);
@@ -169,7 +150,6 @@ let receive ?debug ?(timeout = Clock.after (sec 10.)) ?(swallow=false) t
            ])
           (function
             | `Timeout ->
-              t.data <- List.concat (List.rev !remainses);
               raise (
                 Timed_out_waiting_for
                   { Timed_out_waiting_for.
@@ -177,7 +157,8 @@ let receive ?debug ?(timeout = Clock.after (sec 10.)) ?(swallow=false) t
                     debug;
                     mailbox = describe_in_sexp t;
                   })
-            | `Loop -> loop ())
+            | `Loop ->
+              loop ())
       end
     in
     loop ())
@@ -238,8 +219,8 @@ let zero ?(debug = "") t f =
            (describe t)
            ()
 
-let clear t =
-  t.data <- []
+let clear ?(to_remove=const true) t =
+  t.data <- List.filter t.data ~f:(Fn.compose not to_remove)
 
 let check_clear t =
   if List.is_empty t.data then

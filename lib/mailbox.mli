@@ -10,6 +10,8 @@ module Filter : sig
     select : 'a -> 'b option;
   }
 
+  val create : string -> ('a -> 'b option) -> ('a, 'b) t
+
   (* arrows inspired interface for composing filters *)
 
   (** an always matching filter from a function *)
@@ -22,6 +24,8 @@ module Filter : sig
 
   (** Compose two filters **)
   val ( >>> ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
+
+  val to_predicate : ('a, 'b) t -> ('a -> bool)
 end
 
 val create :
@@ -103,11 +107,12 @@ val not_empty
   -> ('a, 'b) Filter.t
   -> 'b list Deferred.t
 
-(** [clear t] wipes out all previously received messages.
+(** [clear t] wipes out all previously received messages matching the [to_remove]
+    predicate. If [to_remove] is not provided, wipes out all the messages.
 
     Immediately after calling [clear t], [zero t f] succeeds for any [f].
 *)
-val clear : _ t -> unit
+val clear : ?to_remove:('a -> bool) -> 'a t -> unit
 
 (** [check_clear t] - Ok if the mailbox is empty, descriptive error if the mailbox
     has any messages *)

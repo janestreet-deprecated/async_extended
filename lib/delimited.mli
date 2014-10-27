@@ -40,6 +40,12 @@ module Row : sig
   (* [nth_exn t i] return the ith column of t (indexed from 0) *)
   val nth_exn : t -> int -> string
 
+  (* [nth_conv_exn t i _here_ conv] extract the ith column of [t]
+     and convert it using [conv].  If there is an
+     error the error is raised including [row] [i] [error] and
+     the source code position (_here_). *)
+  val nth_conv_exn : t -> int -> Source_code_position.t -> (string -> 'a) -> 'a
+
   (* [nth t i] same as nth_exn, but returns an option in the case where t does not have at
      least i - 1 columns *)
   val nth : t -> int -> string option

@@ -21,25 +21,27 @@ let updates ?(poll_interval=sec 5.) filename ~transform =
       | `Result () -> ()
       | `Timeout   -> loop new_mtime
     in
-    let error e = Pipe.write w (Update.Error e) >>> (fun () -> loop last_mtime) in
-    try_with (fun () -> Unix.stat filename) 
+    let error e = Pipe.write w (Update.Error e) >>> (fun () -> loop None) in
+    try_with (fun () -> Unix.stat filename)
     >>> function
     | Error e -> error (`Read, e)
     | Ok stat ->
-      if Time.(>) stat.Unix.Stats.mtime last_mtime then begin
-        try_with (fun () -> Reader.file_contents filename) 
+      let new_mtime = stat.Unix.Stats.mtime in
+      if Option.value_map last_mtime  ~default:true ~f:(fun mt -> Time.(<>) new_mtime mt)
+      then begin
+        try_with (fun () -> Reader.file_contents filename)
         >>> function
         | Error e -> error (`Read, e)
-        | Ok contents -> 
+        | Ok contents ->
           begin match Result.try_with (fun () -> f contents) with
-          | Ok transformed_contents -> 
+          | Ok transformed_contents ->
             Pipe.write w (Update.Update transformed_contents) >>> fun () ->
-            loop stat.Unix.Stats.mtime
+            loop (Some new_mtime)
           | Error e -> error (`Transform, e)
           end
       end else loop last_mtime
   in
-  loop Time.epoch;
+  loop None;
   r
 
 

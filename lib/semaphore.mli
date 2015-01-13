@@ -19,3 +19,7 @@ val incr : t -> unit
 
 (** Decrement the sempahore.  This blocks if resulting the semaphore value is negative. *)
 val decr : t -> unit Deferred.t
+
+(** Interface to semaphore where the users can only return the tokens they took
+    from semaphore, not add more tokens *)
+val resource : t -> (unit, Nothing.t) Resource.t

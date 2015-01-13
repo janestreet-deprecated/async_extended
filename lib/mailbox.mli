@@ -43,10 +43,9 @@ val of_pipe :
   -> 'a Pipe.Reader.t
   -> 'a t
 
-(** [receive t f] apply [f] to each message in the mailbox, return the list of messages
-    for which [f] returned [Some x].  If [f] does not return [Some x] for any available
-    messages then wait until one arrives for which it does.  If at any point [timeout]
-    becomes determined raise an exception.
+(** [receive t ~filter ~postcond] apply [postcond] to the messages picked by [filter].
+    Return if [postcond] returns true, otherwise keep trying until [timeout] becomes
+    determined, which will raise an exception.
 
     If this returns successfully, the remaining data in the mailbox will be:
 

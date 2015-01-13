@@ -32,3 +32,8 @@ let unlock t =
     | None -> t.is_locked <- false
     | Some ivar -> Ivar.fill ivar ()
 ;;
+
+let resource t =
+  Resource.create
+    ~acquire:(fun () -> Deferred.map ~f:(fun x -> Ok x) (lock t))
+    ~release:(fun () -> unlock t; return ())

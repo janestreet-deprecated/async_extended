@@ -1,4 +1,3 @@
-
 open Core.Std
 open Async.Std
 
@@ -23,7 +22,7 @@ let term_or_kill pid_spec =
       (* SIGTERM is handled by the process: usually the process will stop and perform any
          required cleanup before terminating. *)
       (Signal.send Signal.term pid_spec :> [`No_such_process | `Ok | `Permission_denied])
-    with Unix.Unix_error (Unix.EPERM, _, _) -> `Permission_denied
+    with Unix.Unix_error (EPERM, _, _) -> `Permission_denied
   with
   | `No_such_process -> ()
   | `Permission_denied -> ()
@@ -118,7 +117,8 @@ let create ?kill:kill_def ?(kill_how=`by_pid)
 type file_descr = Unix.File_descr.t
 
 let create_fds'
-    ~kill:kill_def ?(kill_how=`by_pid) ~prog ~args ~stdin ~stdout ~stderr ~f:caller_f () =
+      ~kill:kill_def ?(kill_how=`by_pid)
+      ~prog ~args ?env ~stdin ~stdout ~stderr ~f:caller_f () =
   match Unix.fork () with
   | `In_the_child ->
     begin
@@ -126,7 +126,7 @@ let create_fds'
         Unix.dup2 ~src:stdin ~dst:Unix.stdin;
         Unix.dup2 ~src:stdout ~dst:Unix.stdout;
         Unix.dup2 ~src:stderr ~dst:Unix.stderr;
-        never_returns (Unix.exec ~prog ~args:(prog :: args) ());
+        never_returns (Unix.exec ?env ~prog ~args:(prog :: args) ());
       with
       | _ ->
         Printf.eprintf "exec failed: %s\n%!" prog;
@@ -151,8 +151,8 @@ let create_fds'
     process_status
 ;;
 
-let create_fds ~kill ?kill_how ~prog ~args ~stdin ~stdout ~stderr ~f () =
-  create_fds' ~kill ?kill_how ~prog ~args ~stdin ~stdout ~stderr
+let create_fds ~kill ?kill_how ~prog ~args ?env ~stdin ~stdout ~stderr ~f () =
+  create_fds' ~kill ?kill_how ~prog ~args ?env ~stdin ~stdout ~stderr
     ~f:(fun pid -> f pid; Deferred.unit) ()
   >>| fun ((), eos) ->
   eos

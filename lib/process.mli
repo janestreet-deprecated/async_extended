@@ -1,3 +1,5 @@
+(** This module is deprecated; please use [Async.Std.Process]. *)
+
 open Core.Std
 open Async.Std
 
@@ -16,7 +18,7 @@ val create
   -> ?kill_how:[`by_pid | `by_group]
   -> prog:string
   -> args:string list
-  -> ?env:[`Replace of (string * string) list | `Extend of (string * string) list]
+  -> ?env:Async.Std.Process.env
   -> ?working_dir:string
   -> ?stdin:string
   -> f:(Pid.t -> stdin:Writer.t -> stdout:Reader.t -> stderr:Reader.t -> 'a Deferred.t)
@@ -33,6 +35,7 @@ val create_fds
   -> ?kill_how:[`by_pid | `by_group]
   -> prog:string
   -> args:string list
+  -> ?env:[ Async.Std.Process.env | `Replace_raw of string list ]
   -> stdin:file_descr
   -> stdout:file_descr
   -> stderr:file_descr
@@ -48,6 +51,7 @@ val create_fds'
   -> ?kill_how:[`by_pid | `by_group]
   -> prog:string
   -> args:string list
+  -> ?env:[ Async.Std.Process.env | `Replace_raw of string list ]
   -> stdin:file_descr
   -> stdout:file_descr
   -> stderr:file_descr
@@ -69,7 +73,7 @@ val open_in
 
 type 'a backtick =
   ?kill:unit Deferred.t
-  -> ?env:[`Replace of (string * string) list | `Extend of (string * string) list]
+  -> ?env:Async.Std.Process.env
   -> prog:string
   -> args:string list
   -> ?working_dir:string

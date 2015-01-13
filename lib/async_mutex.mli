@@ -8,6 +8,7 @@
     Rather than use a mutex, one common idiom is to use a [Sequencer] to guarantee one
     client at a time has access to a shared piece of state. *)
 
+open Core.Std
 open Async.Std
 
 type t
@@ -23,3 +24,5 @@ val lock : t -> unit Deferred.t
 val try_lock : t -> [ `Acquired | `Not_acquired ]
 
 val unlock : t -> unit
+
+val resource : t -> (unit, Nothing.t) Resource.t

@@ -1,3 +1,19 @@
+## 112.17.00
+
+- Added `Interactive` module for terminal interaction with users by
+  command-line executables.
+
+  `Interactive` was previously in `Iron_common`.
+- In `Process`, added an `?env` argument to some functions.
+- Allowed `Command_rpc` implementations to access the
+  `Rpc.Connection.t` used to invoke them.
+
+  There is an option to invoke `Command_rpc` implementations via sexp
+  communication instead of `Rpc`, so implementations are given a value
+  of a variant type `Sexp | Bin_io of Rpc.Connection.t`.
+- Added `Resource` module, which abstracts the idea of acquiring and
+  releasing a handle to a resource.
+
 ## 112.06.00
 
 - Unwound a recent change to `Mailbox` where one invocation of `receive`

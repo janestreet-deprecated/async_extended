@@ -1,5 +1,6 @@
 module Any_error              = Any_error
 module Async_heap             = Async_heap
+module Async_mutex            = Async_mutex
 module Cml                    = Cml
 module Coalesced_throttle     = Coalesced_throttle
 module Command_rpc            = Command_rpc
@@ -13,6 +14,7 @@ module Enforcer               = Enforcer
 module Fd_leak_check          = Fd_leak_check
 module Generator              = Generator
 module Gzip                   = Async_gzip
+module Interactive            = Interactive
 module Log = struct
   include Async.Std.Log
   include Extended_log
@@ -28,4 +30,3 @@ module Shutdown               = Shutdown
 module Sound                  = Sound
 module Udp                    = Udp
 module Watcher                = Watcher
-

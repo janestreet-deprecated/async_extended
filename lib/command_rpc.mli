@@ -3,14 +3,22 @@
 open Core.Std
 open Async.Std
 
-(** [Command] is used for setting up an RPC server in the child process. *)
+(** [Command] is used for setting up an RPC server in the child process.  By default this
+    will set up an RPC server, but passing the [-sexp] flag will make it run the
+    implementation on a sexp read from stdin instead.  Passing the [-menu] flag
+    will cause the command to print out a sexp indicating which RPC names and
+    versions are supported.
+*)
 module Command : sig
+  module Invocation : sig
+    type t = Sexp | Bin_io of Rpc.Connection.t
+  end
 
   module type T = sig
     type query    with of_sexp
     type response with sexp_of
     val rpc : (query, response) Rpc.Rpc.t
-    val implementation : query -> response Deferred.t
+    val implementation : Invocation.t -> query -> response Deferred.t
   end
 
   module type T_pipe = sig
@@ -18,8 +26,9 @@ module Command : sig
     type response with sexp_of
     type error    with sexp_of
     val rpc : (query, response, error) Rpc.Pipe_rpc.t
-    val implementation :
-      query
+    val implementation
+      :  Invocation.t
+      -> query
       -> aborted: unit Deferred.t
       -> (response Pipe.Reader.t, error) Result.t Deferred.t
   end

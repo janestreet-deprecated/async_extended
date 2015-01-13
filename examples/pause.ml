@@ -94,7 +94,7 @@ let () =
   main ~cin:() ~cout:();
   Stream.iter (Monitor.detach_and_get_error_stream (Monitor.current ())) ~f:(fun error ->
     match Monitor.extract_exn error with
-    | Unix.Unix_error (Unix.EPIPE, _, _) ->
+    | Unix.Unix_error (EPIPE, _, _) ->
       Shutdown.shutdown 0 ~force:(after (sec 0.01))
     | _ ->
         Print.eprintf "%s\n%!" (Exn.to_string error);

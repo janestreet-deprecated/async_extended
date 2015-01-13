@@ -42,6 +42,11 @@ let decr t =
   end
 ;;
 
+let resource t =
+  Resource.create
+    ~acquire:(fun () -> decr t >>| fun () -> Ok ())
+    ~release:(fun () -> incr t; return ())
+
 TEST_MODULE = struct
   let stabilize = Async_kernel.Scheduler.run_cycles_until_no_jobs_remain
 

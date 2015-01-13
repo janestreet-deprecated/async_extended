@@ -92,8 +92,6 @@ let describe_in_sexp t =
     in
     Sexp.Atom (sprintf "There are %d messages%S" n tip)
 
-let describe t = Sexp.to_string_hum (describe_in_sexp t)
-
 module Timed_out_waiting_for = struct
   type t =
     { filter : string;
@@ -213,10 +211,10 @@ let zero ?(debug = "") t f =
   match peek t f with
   | [] -> ()
   | _ -> failwithf
-           "Mailbox: Not Zero. Filter '%s'. Debug: '%s'.\n%s"
+           !"Mailbox: Not Zero. Filter '%s'. Debug: '%s'.\n%{Sexp}"
            f.Filter.name
            debug
-           (describe t)
+           (describe_in_sexp t)
            ()
 
 let clear ?(to_remove=const true) t =
@@ -226,7 +224,7 @@ let check_clear t =
   if List.is_empty t.data then
     Ok ()
   else
-    Or_error.tag (Or_error.error_string (describe t)) "Unconsumed msgs"
+    Or_error.error "Unconsumed msgs" (describe_in_sexp t) Fn.id
 
 TEST_MODULE = struct
 

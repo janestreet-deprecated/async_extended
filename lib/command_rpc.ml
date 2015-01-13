@@ -2,11 +2,15 @@ open Core.Std
 open Async.Std
 
 module Command = struct
+  module Invocation = struct
+    type t = Sexp | Bin_io of Rpc.Connection.t
+  end
+
   module type T = sig
     type query    with of_sexp
     type response with sexp_of
     val rpc : (query, response) Rpc.Rpc.t
-    val implementation : query -> response Deferred.t
+    val implementation : Invocation.t -> query -> response Deferred.t
   end
 
   module type T_pipe = sig
@@ -14,9 +18,10 @@ module Command = struct
     type response with sexp_of
     type error    with sexp_of
     val rpc : (query, response, error) Rpc.Pipe_rpc.t
-    val implementation :
-      query
-      -> aborted: unit Deferred.t
+    val implementation
+      :  Invocation.t
+      -> query
+      -> aborted : unit Deferred.t
       -> (response Pipe.Reader.t, error) Result.t Deferred.t
   end
 
@@ -39,13 +44,11 @@ module Command = struct
     | `Duplicate_key (name, version) ->
       failwithf "multiple implementations of rpc (%s %d)" name version ()
 
-  let implementation = function
-    | `Plain plain ->
-      let module T = (val plain : T) in
-      Rpc.Rpc.implement T.rpc (fun () q -> T.implementation q)
-    | `Pipe pipe ->
-      let module T = (val pipe : T_pipe) in
-      Rpc.Pipe_rpc.implement T.rpc (fun () q ~aborted -> T.implementation q ~aborted)
+  let implementation : t -> Invocation.t Rpc.Implementation.t = function
+    | `Plain (module T) ->
+      Rpc.Rpc.implement T.rpc T.implementation
+    | `Pipe (module T) ->
+      Rpc.Pipe_rpc.implement T.rpc T.implementation
 
   type call = {
     rpc_name : string;
@@ -76,7 +79,7 @@ module Command = struct
           | Error (`Duplicate_implementations _) -> return `Failure
           | Ok implementations ->
             Rpc.Connection.server_with_close stdin stdout ~implementations
-              ~connection_state:(fun _ -> ()) ~on_handshake_error:`Raise
+              ~connection_state:(fun conn -> Bin_io conn) ~on_handshake_error:`Raise
             >>| fun () ->
             `Success
         end
@@ -90,17 +93,15 @@ module Command = struct
           | None -> failwithf "unimplemented rpc: (%s, %d)" call.rpc_name call.version ()
           | Some impl ->
             match impl with
-            | `Plain plain ->
-              let module T = (val plain : T) in
+            | `Plain (module T) ->
               let query = T.query_of_sexp call.query in
-              T.implementation query
+              T.implementation Sexp query
               >>| fun response ->
               write_sexp stdout (T.sexp_of_response response);
               `Success
-            | `Pipe pipe ->
-              let module T = (val pipe : T_pipe) in
+            | `Pipe (module T) ->
               let query = T.query_of_sexp call.query in
-              T.implementation query ~aborted:(Deferred.never ())
+              T.implementation Sexp query ~aborted:(Deferred.never ())
               >>= function
               | Error e ->
                 write_sexp stdout (T.sexp_of_error e);
@@ -140,7 +141,11 @@ module Connection = struct
     ?propogate_stderr:bool (* defaults to true *) -> prog:string -> args:string list -> 'a
 
   let transfer_stderr child_stderr =
-    don't_wait_for (Reader.transfer child_stderr (Writer.pipe (Lazy.force Writer.stderr)))
+    don't_wait_for begin
+      Reader.transfer child_stderr (Writer.pipe (Lazy.force Writer.stderr))
+      >>= fun () ->
+      Reader.close child_stderr
+    end
 
   let reap pid = don't_wait_for (Deferred.ignore (Unix.waitpid pid))
 

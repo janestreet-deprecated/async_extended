@@ -1,0 +1,13 @@
+# OASIS_START
+# DO NOT EDIT (digest: e5daf8c508de2530897c5adf3d99105a)
+version = "112.17.00"
+description = "Additional utilities for async"
+requires =
+"async camlzip core core_extended textutils threads bin_prot pa_ounit pa_test sexplib"
+archive(byte) = "async_extended.cma"
+archive(byte, plugin) = "async_extended.cma"
+archive(native) = "async_extended.cmxa"
+archive(native, plugin) = "async_extended.cmxs"
+exists_if = "async_extended.cma"
+# OASIS_STOP
+

@@ -184,7 +184,7 @@ let open_in ?(is_ok = Result.is_ok) ?kill ~prog ~args () =
 
 type 'a backtick =
   ?kill:unit Deferred.t
-  -> ?env:[`Replace of (string * string) list | `Extend of (string * string) list]
+  -> ?env:Unix.env
   -> prog:string
   -> args:string list
   -> ?working_dir:string

@@ -40,14 +40,14 @@ end
 
 module Connection : sig
   type 'a with_connection_args =
-    ?propogate_stderr:bool (* defaults to true *)
+    ?propagate_stderr:bool (* defaults to true *)
     -> prog:string
     -> args:string list
     -> 'a
 
   (** [create] spawns a child process and returns an RPC connection that operates on the
       child's stdin and stdout.  The child will be killed and reaped when the connection
-      is closed.  If [propogate_stderr] is true, the child's stderr will be printed on the
+      is closed.  If [propagate_stderr] is true, the child's stderr will be printed on the
       parent's stderr; otherwise it will be ignored. *)
   val create :
     (unit -> Rpc.Connection.t Or_error.t Deferred.t) with_connection_args

@@ -1,5 +1,5 @@
 open Core.Std
-open Async_kernel.Std
+open Async.Std
 
 module Raw = struct
   module Handle = struct

@@ -138,7 +138,7 @@ end
 
 module Connection = struct
   type 'a with_connection_args =
-    ?propogate_stderr:bool (* defaults to true *) -> prog:string -> args:string list -> 'a
+    ?propagate_stderr:bool (* defaults to true *) -> prog:string -> args:string list -> 'a
 
   let transfer_stderr child_stderr =
     don't_wait_for begin
@@ -149,17 +149,17 @@ module Connection = struct
 
   let reap pid = don't_wait_for (Deferred.ignore (Unix.waitpid pid))
 
-  let connect_gen ~propogate_stderr ~prog ~args f =
+  let connect_gen ~propagate_stderr ~prog ~args f =
     Process.create ~prog ~args ()
     >>=? fun process ->
-    if propogate_stderr then
+    if propagate_stderr then
       transfer_stderr (Process.stderr process);
     reap (Process.pid process);
     f ~stdin:(Process.stdin process) ~stdout:(Process.stdout process)
   ;;
 
-  let with_close ?(propogate_stderr=true) ~prog ~args dispatch_queries =
-    connect_gen ~propogate_stderr ~prog ~args
+  let with_close ?(propagate_stderr=true) ~prog ~args dispatch_queries =
+    connect_gen ~propagate_stderr ~prog ~args
       (fun ~stdin ~stdout ->
         Rpc.Connection.with_close
           stdout
@@ -169,8 +169,8 @@ module Connection = struct
           ~dispatch_queries)
   ;;
 
-  let create ?(propogate_stderr = true) ~prog ~args () =
-    connect_gen ~propogate_stderr ~prog ~args
+  let create ?(propagate_stderr = true) ~prog ~args () =
+    connect_gen ~propagate_stderr ~prog ~args
       (fun ~stdin ~stdout ->
         Rpc.Connection.create
           stdout

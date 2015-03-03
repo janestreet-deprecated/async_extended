@@ -1,3 +1,8 @@
+## 112.24.00
+
+- Fixed misspelling in `Command_rpc.Connection`, renaming `propogate_stderr` as
+  `propagate_stderr`.
+
 ## 112.17.00
 
 - Added `Interactive` module for terminal interaction with users by

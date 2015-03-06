@@ -1,0 +1,42 @@
+# OASIS_START
+# DO NOT EDIT (digest: b8bf0e78b4938a3369a9e40a0b3bb5bf)
+Any_error
+Async_cbreak
+Async_gzip
+Async_heap
+Async_mutex
+Cml
+Coalesced_throttle
+Command_rpc
+Cpu_load
+Deferred_list
+Delimited
+Deprecated_async_bench
+Durable
+Durable_subscription
+Embedded_script
+Enforcer
+Extended_log
+Fd_leak_check
+File_updates
+Generator
+Interactive_edit
+Interactive
+Mailbox
+Pipe_zipper
+Priority_queue
+Process
+Reader_ext
+Ref
+Resource
+Rpc_proxy
+Safe_pipe
+Semaphore
+Shutdown
+Signal
+Sound
+Std
+Synccast
+Udp
+Watcher
+# OASIS_STOP

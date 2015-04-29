@@ -20,7 +20,7 @@ Description:
   suite but they might still be useful.
 
 Library async_extended
-  Path:               lib
+  Path:               src
   Pack:               true
   Modules:            Any_error,
                       Async_cbreak,
@@ -84,14 +84,14 @@ Library async_extended
                       sexplib
 
 Executable pause
-  Path:               examples
+  Path:               example
   MainIs:             pause.ml
   CompiledObject:     best
   Install:            false
   BuildDepends:       async_extended
 
 Executable primes
-  Path:               examples
+  Path:               example
   MainIs:             primes.ml
   CompiledObject:     best
   Install:            false

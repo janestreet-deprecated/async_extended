@@ -2,7 +2,7 @@ OASISFormat:      0.3
 OCamlVersion:     >= 4.00.1
 FindlibVersion:   >= 1.3.2
 Name:             async_extended
-Version:          112.24.00
+Version:          112.35.00
 Synopsis:         Additional utilities for async
 Authors:          Jane Street Group, LLC <opensource@janestreet.com>
 Copyrights:       (C) 2013 Jane Street Group LLC <opensource@janestreet.com>
@@ -44,6 +44,7 @@ Library async_extended
                       Generator,
                       Interactive_edit,
                       Interactive,
+                      Ltl,
                       Mailbox,
                       Pipe_zipper,
                       Priority_queue,

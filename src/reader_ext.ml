@@ -55,6 +55,10 @@ let with_hadoop_gzip_file ~hadoop_file f =
   with_input_from_process ~prog:"bash"
     ~args:["-c"; sprintf "qdfsCmd.exe cat %s | gunzip -c" hadoop_file ] f
 
+let with_xzip_file file ~f =
+  with_input_from_process ~prog:"xzcat" ~args:["--stdout"; file] f
+
+
 let open_gzip_file file =
   Process.open_in ~is_ok:gzip_is_ok ~prog:"gunzip" ~args:["--to-stdout"; file] ()
   >>= fun {Process.Output.stdout = stdout; stderr} ->

@@ -19,6 +19,7 @@ module Log = struct
   include Async.Std.Log
   include Extended_log
 end
+module Ltl                    = Ltl
 module Mailbox                = Mailbox
 module Pipe_zipper            = Pipe_zipper
 module Priority_queue         = Priority_queue

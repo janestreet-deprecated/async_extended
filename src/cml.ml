@@ -29,7 +29,7 @@ module X = Monad.Make (struct
 end)
 let all_ignore = X.all_ignore
 let all        = X.all
-let ignore     = X.ignore
+let ignore_m     = X.ignore_m
 module Monad_infix = X.Monad_infix
 include Monad_infix
 

@@ -43,7 +43,40 @@ val ask_ynf
   -> 'a
 
 val show_file
-  :  ?msg:string
+  :  ?pager:string
+  -> ?msg:string
   -> file:string
   -> unit
   -> unit Deferred.t
+
+module Job : sig
+  (** This module allows you to have messages printed when you start and finish jobs
+      without having a bad interaction in case of interleaved jobs run in parallel.
+
+      Example of code:
+
+      {[
+        Interactive.Job.run !"starting doing stuff A in process %{Pid}" pid
+          ~f:(fun () -> do_stuff_A ())
+        >>= fun () ->
+      ]}
+
+      Example of output:
+
+      1 process:
+
+      {[
+        starting doing stuff A in process 1234 ... done.
+      ]}
+
+      Multiple processes:
+
+      {[
+        starting doing stuff A in process 1234 ...
+        starting doing stuff A in process 4321 ...
+        all done.
+        starting doing stuff A in process 5678 ... done.
+      ]}
+  *)
+  val run : f:(unit -> 'a Deferred.t) -> ('r, unit, string, 'a Deferred.t) format4 -> 'r
+end

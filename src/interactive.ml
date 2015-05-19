@@ -3,10 +3,72 @@ open Async.Std
 
 let interactive = ref Core.Std.Unix.(isatty stdin && isatty stdout)
 
+let print_string_internal string =
+  if not !interactive
+  then return ()
+  else begin
+    print_string string;
+    Writer.flushed (force Writer.stdout)
+  end
+;;
+
+module Job : sig
+  val maybe_print_newline : unit -> unit
+  val run : f:(unit -> 'a Deferred.t) -> ('r, unit, string, 'a Deferred.t) format4 -> 'r
+end = struct
+  let needs_a_newline = ref false
+  let num_jobs_running = ref 0
+  let num_jobs_pending_done_msg = ref 0
+
+  let maybe_print_newline () =
+    if !needs_a_newline then begin
+      needs_a_newline := false;
+      if !interactive then print_string "\n";
+    end
+  ;;
+
+  let start str =
+    incr num_jobs_running;
+    maybe_print_newline ();
+    needs_a_newline := true;
+    print_string_internal (str ^ " ... ")
+  ;;
+
+  let finish () =
+    num_jobs_running := max 0 (pred !num_jobs_running);
+    if !num_jobs_running > 0
+    then begin
+      incr num_jobs_pending_done_msg;
+      Deferred.unit
+    end else begin
+      let plural = !num_jobs_pending_done_msg > 1 in
+      num_jobs_pending_done_msg := 0;
+      if plural
+      then begin
+        maybe_print_newline ();
+        print_string_internal "all done.\n"
+      end else begin
+        needs_a_newline := false;
+        print_string_internal "done.\n";
+      end
+    end
+  ;;
+
+  let run ~f fmt =
+    let k str =
+      start str
+      >>= fun job ->
+      Monitor.protect f ~finally:(fun () -> finish job)
+    in
+    ksprintf k fmt
+  ;;
+end
+
 let print_string string =
   if not !interactive
   then return ()
   else begin
+    Job.maybe_print_newline ();
     print_string string;
     Writer.flushed (force Writer.stdout)
   end
@@ -151,13 +213,16 @@ let ask_ynf ?default question =
   Printf.ksprintf (ask_yn ?default) question
 ;;
 
-let show_file ?msg ~file () =
+let show_file ?pager ?msg ~file () =
   let pager =
-    match Sys.getenv "PAGER" with
-    (* Make sure -R is passed to 'less' *)
-    | Some p when String.is_prefix p ~prefix:"less" -> p ^ " -R"
-    | Some p -> p
-    | None -> "less -R"
+    match pager with
+    | Some pager -> pager
+    | None ->
+      match Sys.getenv "PAGER" with
+      (* Make sure -R is passed to 'less' *)
+      | Some p when String.is_prefix p ~prefix:"less" -> p ^ " -R"
+      | Some p -> p
+      | None -> "less -R"
   in
   let q = Filename.quote in
   let cmd =

@@ -3,31 +3,21 @@ open Async.Std
 
 type ('ok, 'err) t = ('ok, 'err) Deferred.Result.t
 
-let return = Deferred.Result.return
-let map = Deferred.Result.map
-
-let both at bt =
-  Deferred.choose
-    [ Deferred.choice at (fun x -> `A x)
-    ; Deferred.choice bt (fun x -> `B x)
-    ]
-  >>= function
-  | `A (Error _ as err)
-  | `B (Error _ as err) -> Deferred.return err
-  | `A (Ok a) -> map bt ~f:(fun b -> (a, b))
-  | `B (Ok b) -> map at ~f:(fun a -> (a, b))
-
-let (<*>) = fun abt at -> map (both abt at) ~f:(fun (f, x) -> f x)
-
-let map2 at bt ~f = map (both at bt) ~f:(fun (a,b) -> f a b)
-
-let all ts =
-  let cons x xs = x :: xs in
-  let rec go acc = function
-    | [] -> map acc ~f:List.rev
-    | t :: ts -> go (return cons <*> t <*> acc) ts
-  in
-  go (return []) ts
+include Applicative.Make2(struct
+  type nonrec ('ok, 'err) t = ('ok, 'err) t
+  let return = Deferred.Result.return
+  let apply ft xt =
+    Deferred.choose
+      [ Deferred.choice ft (fun f -> `F f)
+      ; Deferred.choice xt (fun x -> `X x)
+      ]
+    >>= function
+    | `F (Error _ as err)
+    | `X (Error _ as err) -> Deferred.return err
+    | `F (Ok f) -> Deferred.Result.map xt ~f:(fun x -> f x)
+    | `X (Ok x) -> Deferred.Result.map ft ~f:(fun f -> f x)
+  let map = `Custom Deferred.Result.map
+end)
 
 let all_ignore ts = Deferred.create (fun r ->
   Deferred.List.iter ~how:`Parallel ts ~f:(fun t ->

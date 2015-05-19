@@ -1,3 +1,12 @@
+## 112.35.00
+
+- Added `Ltl` module, an implementation of linear temporal logic, which
+  can be used to run online queries on sequences of states.
+- Added `Interactive.Job`, for printing start/done messages for multiple
+  simultaneous jobs.
+- Made `Any_error` be `Applicative`.
+- Added `Command_rpc` support for `Versioned_rpc.Both_convert.Plain`.
+
 ## 112.24.00
 
 - Fixed misspelling in `Command_rpc.Connection`, renaming `propogate_stderr` as

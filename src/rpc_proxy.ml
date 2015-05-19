@@ -13,6 +13,13 @@ let rpc_proxy :
       raise_on_closed_connection connection;
       Rpc.Rpc.dispatch_exn rpc connection query)
 
+let one_way_proxy :
+  'm . 'm Rpc.One_way.t -> Rpc.Connection.t Rpc.Implementation.t
+  = fun rpc ->
+    Rpc.One_way.implement rpc (fun connection query ->
+      raise_on_closed_connection connection;
+      Or_error.ok_exn (Rpc.One_way.dispatch rpc connection query))
+
 let pipe_proxy :
   'q 'e 'r. ('q, 'e, 'r) Rpc.Pipe_rpc.t -> Rpc.Connection.t Rpc.Implementation.t
   = fun rpc ->
@@ -51,6 +58,7 @@ let state_proxy :
       )
 
 let proxy : Rpc.Any.t -> _ = function
-  | Rpc.Any.Rpc   rpc -> rpc_proxy   rpc
-  | Rpc.Any.Pipe  rpc -> pipe_proxy  rpc
-  | Rpc.Any.State rpc -> state_proxy rpc
+  | Rpc.Any.Rpc     rpc -> rpc_proxy     rpc
+  | Rpc.Any.Pipe    rpc -> pipe_proxy    rpc
+  | Rpc.Any.State   rpc -> state_proxy   rpc
+  | Rpc.Any.One_way rpc -> one_way_proxy rpc

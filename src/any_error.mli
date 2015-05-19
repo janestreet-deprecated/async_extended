@@ -17,19 +17,6 @@ open Async.Std
     necessary. *)
 type ('ok, 'err) t = ('ok, 'err) Deferred.Result.t
 
-val return : 'ok -> ('ok, 'err) t
-val map : ('a, 'err) t -> f:('a -> 'b) -> ('b, 'err) t
-val map2 : ('a, 'err) t -> ('b, 'err) t -> f:('a -> 'b -> 'c) -> ('c, 'err) t
+include Applicative.S2 with type ('ok, 'err) t := ('ok, 'err) t
 
-val all : ('ok, 'err) t list -> ('ok list, 'err) t
 val all_ignore : (unit, 'err) t list -> (unit, 'err) t
-
-val both : ('a, 'err) t -> ('b, 'err) t -> ('a * 'b, 'err) t
-
-(** Repeated applications of (<*>) can be used to apply functions of arbitrary arity
-    inside ['ok t] values, e.g.
-    {|
-      return (+) <*> get_first_int () <*> get_second_int ()
-    |}
-*)
-val (<*>) : ('a -> 'b, 'err) t -> ('a, 'err) t -> ('b, 'err) t

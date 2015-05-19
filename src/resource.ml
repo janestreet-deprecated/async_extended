@@ -206,7 +206,6 @@ TEST_MODULE = struct
     let maximum = ref 0 in
     let current = ref 0 in
     create (fun () -> Deferred.return (
-      Core.Std.printf "acq %d\n" (!current);
       if !current >= limit
       then Error ()
       else
@@ -214,7 +213,6 @@ TEST_MODULE = struct
           current := !current + 1;
           maximum := max (!maximum) (!current);
           Ok (!current, Handle.create ~release:(fun () ->
-            Core.Std.printf "rel %d\n" (!current);
             Deferred.return (current := !current - 1)
           ))
         end))

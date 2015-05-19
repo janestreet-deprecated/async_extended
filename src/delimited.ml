@@ -98,6 +98,31 @@ module Row = struct
     | _ -> None
   ;;
 
+  let get_opt_exn t header =
+    match get t header with
+    | None ->
+      Error.failwiths "no header in row"
+        (`header header, `row t)
+        <:sexp_of< [`header of string] * [`row of t] >>
+    | Some "" ->
+      None
+    | Some str ->
+      Some str
+
+  let get_conv_opt_exn t header here conv =
+    match get_opt_exn t header with
+    | None ->
+      None
+    | Some v ->
+      try
+        Some (conv v)
+      with
+      | exn ->
+        Error.failwithp here "failed to parse"
+          (`header header, `row t, `exn exn)
+          <:sexp_of< [`header of string] * [`row of t] * [`exn of Exn.t] >>
+  ;;
+
   let nth_exn t i = t.data.(i)
 
   let nth_conv_exn t i here conv =
@@ -267,7 +292,7 @@ let of_reader
   let row_queue     = Queue.create () in
   let emit_field    = make_emit_field ~strip current_row field in
   let emit_row      = make_emit_row current_row row_queue header ~lineno in
-  let flush_rows () = Pipe.write' pipe_w row_queue in
+  let flush_rows () = Pipe.transfer_in pipe_w ~from:row_queue in
   let prev_was_cr   = ref false in
   let emit_pending_cr () =
     if !prev_was_cr then begin
@@ -374,7 +399,7 @@ module Csv = struct
     let emit_field    = make_emit_field ~strip current_row field in
     let emit_row      = make_emit_row current_row row_queue header ~lineno in
     let flush_rows () =
-      Pipe.write' pipe_w row_queue >>| fun () ->
+      Pipe.transfer_in pipe_w ~from:row_queue >>| fun () ->
       Queue.clear row_queue
     in
     let close () =

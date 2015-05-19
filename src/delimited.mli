@@ -33,9 +33,17 @@ module Row : sig
   (* [get_exn t header] return the column of the row corresponding to header *)
   val get_exn : t -> string -> string
 
+  (* [get_conv_opt_exn] is like [get_conv_exn], but empty strings are converted to
+     [None].  Missing headers raise exceptions. *)
+  val get_conv_opt_exn : t -> string -> Source_code_position.t -> (string -> 'a) -> 'a option
+
   (* [get t header] same as get_exn, but returns an option when the header
      was not found *)
   val get : t -> string -> string option
+
+  (* [get_opt_exn] is like [get_exn], but empty strings are converted to [None].  Missing
+     headers raise exceptions. *)
+  val get_opt_exn : t -> string -> string option
 
   (* [nth_exn t i] return the ith column of t (indexed from 0) *)
   val nth_exn : t -> int -> string

@@ -13,6 +13,13 @@ module Command = struct
     val implementation : Invocation.t -> query -> response Deferred.t
   end
 
+  module type T_conv = sig
+    include Versioned_rpc.Both_convert.Plain.S
+    val query_of_sexp    : Sexp.t -> callee_query
+    val sexp_of_response : callee_response -> Sexp.t
+    val implementation : Invocation.t -> callee_query -> callee_response Deferred.t
+  end
+
   module type T_pipe = sig
     type query    with of_sexp
     type response with sexp_of
@@ -25,30 +32,40 @@ module Command = struct
       -> (response Pipe.Reader.t, error) Result.t Deferred.t
   end
 
-  type t = [ `Plain of (module T) | `Pipe of (module T_pipe) ]
+  type t = [
+    | `Plain      of (module T)
+    | `Plain_conv of (module T_conv)
+    | `Pipe       of (module T_pipe)
+  ]
 
   let menu impls =
     match
       Map.Poly.of_alist
-        (List.map impls ~f:(fun impl ->
+        (List.concat_map impls ~f:(fun impl ->
           match impl with
           | `Plain plain ->
             let module T = (val plain : T) in
-            ((Rpc.Rpc.name T.rpc, Rpc.Rpc.version T.rpc), impl)
+            [((Rpc.Rpc.name T.rpc, Rpc.Rpc.version T.rpc), impl)]
+          | `Plain_conv x ->
+            let module T = (val x : T_conv) in
+            let versions = Set.to_list @@ T.versions () in
+            List.map versions ~f:(fun version -> ((T.name, version), impl))
           | `Pipe pipe ->
             let module T = (val pipe : T_pipe) in
-            ((Rpc.Pipe_rpc.name T.rpc, Rpc.Pipe_rpc.version T.rpc), impl)
+            [((Rpc.Pipe_rpc.name T.rpc, Rpc.Pipe_rpc.version T.rpc), impl)]
          ))
     with
     | `Ok map -> map
     | `Duplicate_key (name, version) ->
       failwithf "multiple implementations of rpc (%s %d)" name version ()
 
-  let implementation : t -> Invocation.t Rpc.Implementation.t = function
+  let implementations : t -> Invocation.t Rpc.Implementation.t list = function
     | `Plain (module T) ->
-      Rpc.Rpc.implement T.rpc T.implementation
+      [Rpc.Rpc.implement T.rpc T.implementation]
+    | `Plain_conv (module T) ->
+      T.implement_multi (fun s ~version:_ q -> T.implementation s q)
     | `Pipe (module T) ->
-      Rpc.Pipe_rpc.implement T.rpc T.implementation
+      [Rpc.Pipe_rpc.implement T.rpc T.implementation]
 
   type call = {
     rpc_name : string;
@@ -74,12 +91,14 @@ module Command = struct
           match
             Rpc.Implementations.create
               ~on_unknown_rpc:`Raise
-              ~implementations:(Versioned_rpc.Menu.add (List.map ~f:implementation impls))
+              ~implementations:(Versioned_rpc.Menu.add
+                                  (List.concat_map ~f:implementations impls))
           with
           | Error (`Duplicate_implementations _) -> return `Failure
           | Ok implementations ->
-            Rpc.Connection.server_with_close stdin stdout ~implementations
-              ~connection_state:(fun conn -> Bin_io conn) ~on_handshake_error:`Raise
+            Rpc.Connection.server_with_close stdin stdout
+              ~implementations ~connection_state:(fun conn -> Bin_io conn)
+              ~on_handshake_error:`Raise
             >>| fun () ->
             `Success
         end
@@ -94,6 +113,12 @@ module Command = struct
           | Some impl ->
             match impl with
             | `Plain (module T) ->
+              let query = T.query_of_sexp call.query in
+              T.implementation Sexp query
+              >>| fun response ->
+              write_sexp stdout (T.sexp_of_response response);
+              `Success
+            | `Plain_conv (module T) ->
               let query = T.query_of_sexp call.query in
               T.implementation Sexp query
               >>| fun response ->
@@ -162,8 +187,7 @@ module Connection = struct
     connect_gen ~propagate_stderr ~prog ~args
       (fun ~stdin ~stdout ->
         Rpc.Connection.with_close
-          stdout
-          stdin
+          stdout stdin
           ~connection_state:(fun _ -> ())
           ~on_handshake_error:`Raise
           ~dispatch_queries)
@@ -173,8 +197,7 @@ module Connection = struct
     connect_gen ~propagate_stderr ~prog ~args
       (fun ~stdin ~stdout ->
         Rpc.Connection.create
-          stdout
-          stdin
+          stdout stdin
           ~connection_state:(fun _ -> ())
         >>| Or_error.of_exn_result)
   ;;

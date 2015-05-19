@@ -14,7 +14,7 @@ val spawn : (unit -> never_returns t) -> unit
 (** [abort] kills the current "thread" *)
 val abort : never_returns t
 
-(** [block d] waits for a [d] to become determined before continuing with the 
+(** [block d] waits for a [d] to become determined before continuing with the
     result *)
 val block : 'a Deferred.t -> 'a t
 

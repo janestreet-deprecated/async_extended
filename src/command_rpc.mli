@@ -21,6 +21,13 @@ module Command : sig
     val implementation : Invocation.t -> query -> response Deferred.t
   end
 
+  module type T_conv = sig
+    include Versioned_rpc.Both_convert.Plain.S
+    val query_of_sexp    : Sexp.t -> callee_query
+    val sexp_of_response : callee_response -> Sexp.t
+    val implementation : Invocation.t -> callee_query -> callee_response Deferred.t
+  end
+
   module type T_pipe = sig
     type query    with of_sexp
     type response with sexp_of
@@ -33,7 +40,11 @@ module Command : sig
       -> (response Pipe.Reader.t, error) Result.t Deferred.t
   end
 
-  type t = [ `Plain of (module T) | `Pipe of (module T_pipe) ]
+  type t = [
+    | `Plain      of (module T)
+    | `Plain_conv of (module T_conv)
+    | `Pipe       of (module T_pipe)
+  ]
 
   val create : summary:string -> t list -> Command.t
 end

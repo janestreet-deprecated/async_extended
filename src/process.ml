@@ -129,7 +129,7 @@ let create_fds'
         never_returns (Unix.exec ?env ~prog ~args:(prog :: args) ());
       with
       | _ ->
-        Printf.eprintf "exec failed: %s\n%!" prog;
+        Core.Std.Printf.eprintf "exec failed: %s\n%!" prog;
         Unix.exit_immediately 1
     end
   | `In_the_parent pid ->

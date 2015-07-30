@@ -132,7 +132,7 @@ TEST_MODULE = struct
       poke t;
       poke t
     end;
-    go ();
+    go ()
 
   TEST_UNIT =
     build_break_poke ~use_fix:true ~now:true;

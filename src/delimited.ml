@@ -181,7 +181,8 @@ end
 type ('a,'b) reader =
        ?strip:bool
     -> ?skip_lines:int
-    -> ?on_parse_error:[`Raise | `Handle of (string Queue.t -> exn -> [`Continue | `Finish])]
+    -> ?on_parse_error:[`Raise
+                       | `Handle of (string Queue.t -> exn -> [`Continue | `Finish])]
     -> header:'a
     -> 'b
 
@@ -292,7 +293,9 @@ let of_reader
   let row_queue     = Queue.create () in
   let emit_field    = make_emit_field ~strip current_row field in
   let emit_row      = make_emit_row current_row row_queue header ~lineno in
-  let flush_rows () = Pipe.transfer_in pipe_w ~from:row_queue in
+  let flush_rows () =
+    Pipe.transfer_in pipe_w ~from:row_queue
+  in
   let prev_was_cr   = ref false in
   let emit_pending_cr () =
     if !prev_was_cr then begin
@@ -382,16 +385,18 @@ module Csv = struct
   (* row up to the error, and the field with the error up to the point of failure *)
   exception Bad_csv_formatting of string list * string
 
-  let of_reader
-      ?(strip=false)
-      ?(skip_lines=0)
-      ?(on_parse_error=`Raise)
-      ~header
-      ?sep:(separator=default_separator)
-      reader =
+(* Returns a function that takes values of the type:
+
+   [ `Data of (string * int) | `Eof ]
+
+   where the [int] argument to `Data indicates the prefix of the string that contains
+   valid data.  This is useful when passing buffers filled by a Reader. *)
+  let create_chunk_processor
+        ?(strip=false)
+        ?sep:(separator=default_separator)
+        ~header
+        () =
     let lineno        = ref 1 in
-    let pipe_r,pipe_w = Pipe.create () in
-    let buffer        = String.create buffer_size in
     let state         = ref StartField in
     let field         = Buffer.create 1 in
     let current_row   = Queue.create () in
@@ -399,16 +404,11 @@ module Csv = struct
     let emit_field    = make_emit_field ~strip current_row field in
     let emit_row      = make_emit_row current_row row_queue header ~lineno in
     let flush_rows () =
-      Pipe.transfer_in pipe_w ~from:row_queue >>| fun () ->
-      Queue.clear row_queue
+      let data = Queue.to_list row_queue in
+      Queue.clear row_queue;
+      data
     in
-    let close () =
-      don't_wait_for (flush_rows ());
-      don't_wait_for (Reader.close reader);
-      Pipe.close pipe_w;
-    in
-    let rec loop () =
-      Reader.read reader buffer >>> function
+    stage (function
       | `Eof ->
         begin match !state with
         | StartField ->
@@ -416,86 +416,124 @@ module Csv = struct
             emit_field ();
             emit_row ()
           end;
-          close ()
+          flush_rows ()
         | InUnquotedField
         | InQuotedFieldAfterQuote ->
           emit_field ();
           emit_row ();
-          close ();
+          flush_rows ()
         | InQuotedField ->
-          close ();
           raise (Bad_csv_formatting (Queue.to_list current_row, Buffer.contents field))
         end
-      | `Ok n ->
-        let res =
-          Result.try_with (fun () ->
-            for i = 0 to n - 1 do
-              let c = buffer.[i] in
-              if c <> '\r' then
-                match !state with
-                | StartField ->
-                  if      c = '\"'      then state := InQuotedField
-                  else if c = separator then emit_field ()
-                  else if c = '\n'      then (emit_field (); emit_row ())
-                  else begin
-                    Buffer.add_char field c;
-                    state := InUnquotedField
-                  end
-                | InUnquotedField ->
-                  begin
-                    if c = separator then
-                      (emit_field (); state := StartField)
-                    else if c = '\n' then (
-                      emit_field ();
-                      emit_row ();
-                      state := StartField)
-                    else Buffer.add_char field c
-                  end
-                | InQuotedField ->
-                  if c = '\"' then
-                    state := InQuotedFieldAfterQuote
-                  else
-                    Buffer.add_char field c
-                | InQuotedFieldAfterQuote ->
-                  if c = '\"' then ( (* doubled quote *)
-                    Buffer.add_char field c;
-                    state := InQuotedField)
-                  else if c = '0' then (
-                    Buffer.add_char field '\000';
-                    state := InQuotedField)
-                  else if c = separator then (
-                    emit_field ();
-                    state := StartField)
+      | `Data (buffer, n) ->
+          for i = 0 to n - 1 do
+            let c = buffer.[i] in
+            if c <> '\r' then
+              match !state with
+              | StartField ->
+                if      c = '\"'      then state := InQuotedField
+                else if c = separator then emit_field ()
+                else if c = '\n'      then (emit_field (); emit_row ())
+                else begin
+                  Buffer.add_char field c;
+                  state := InUnquotedField
+                end
+              | InUnquotedField ->
+                begin
+                  if c = separator then
+                    (emit_field (); state := StartField)
                   else if c = '\n' then (
                     emit_field ();
                     emit_row ();
                     state := StartField)
-                  else if Char.is_whitespace c then ()
-                  else
-                    failwithf "InQuotedFieldAfterQuote looking at '%c' (lineno=%d)"
-                      c (!lineno) ()
-            done)
-        in
-        flush_rows ()
-        >>> (fun () ->
-        match res with
-        | Ok ()   -> loop ()
-        | Error e ->
-          match on_parse_error with
-          | `Raise    -> raise e
-          | `Handle f ->
-            emit_field ();
-            match f current_row e with
-            | `Continue -> loop ()
-            | `Finish   -> close ())
+                  else Buffer.add_char field c
+                end
+              | InQuotedField ->
+                if c = '\"' then
+                  state := InQuotedFieldAfterQuote
+                else
+                  Buffer.add_char field c
+              | InQuotedFieldAfterQuote ->
+                if c = '\"' then ( (* doubled quote *)
+                  Buffer.add_char field c;
+                  state := InQuotedField)
+                else if c = '0' then (
+                  Buffer.add_char field '\000';
+                  state := InQuotedField)
+                else if c = separator then (
+                  emit_field ();
+                  state := StartField)
+                else if c = '\n' then (
+                  emit_field ();
+                  emit_row ();
+                  state := StartField)
+                else if Char.is_whitespace c then ()
+                else
+                  failwithf "InQuotedFieldAfterQuote looking at '%c' (lineno=%d)"
+                    c (!lineno) ()
+          done;
+          flush_rows ())
+  ;;
+
+  let create_manual
+        ?strip
+        ?sep
+        ~header
+        () =
+    let process = unstage (create_chunk_processor ?strip ~header ?sep ()) in
+    stage (function
+      | `Eof    -> process `Eof
+      | `Data s -> process (`Data (s, String.length s)))
+  ;;
+
+  let of_reader
+        ?strip
+        ?(skip_lines=0)
+        ?sep
+        ~header
+        reader =
+    let pipe_r,pipe_w = Pipe.create () in
+    let buffer        = String.create buffer_size in
+    let close () =
+      Pipe.close pipe_w;
+      don't_wait_for (Reader.close reader)
     in
-    upon (drop_lines reader skip_lines) loop;
+    upon (Pipe.closed pipe_w) (fun () -> close ());
+    let process = unstage (create_chunk_processor ?strip ~header ?sep ()) in
+    let update s =
+      if not (Pipe.is_closed pipe_w)
+      then List.iter (process s) ~f:(Pipe.write_without_pushback pipe_w);
+      Pipe.pushback pipe_w
+    in
+    let rec loop () =
+      Monitor.try_with (fun () -> Reader.read reader buffer)
+      >>= function
+      | Error exn ->
+        (* Reader.read throws an exception if the reader is closed.
+           If the pipe has already closed, then we shouldn't care about
+           these errors. *)
+        if Pipe.is_closed pipe_w
+        then Deferred.unit
+        else begin
+          close ();
+          raise exn;
+        end
+      | Ok `Eof ->
+        update `Eof
+        >>| fun () ->
+        close ()
+      | Ok (`Ok n) ->
+        update (`Data (buffer, n))
+        >>= fun () ->
+        loop ()
+    in
+    upon (drop_lines reader skip_lines) (fun () -> don't_wait_for (loop ()));
     pipe_r
   ;;
 
-  let create_reader ?strip ?skip_lines ?on_parse_error ~header ?sep filename =
+  let create_reader ?strip ?skip_lines ?sep ~header filename =
     Reader.open_file filename >>| fun r ->
-    of_reader ?strip ?skip_lines ?on_parse_error ~header ?sep r
+    of_reader ?strip ?skip_lines ~header ?sep r
   ;;
 
   let write_field w field = Writer.write w (Csv_writer.maybe_escape_field field)

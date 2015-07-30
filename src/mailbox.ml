@@ -8,7 +8,7 @@ type 'a t = {
 }
 
 module Filter = struct
-  type t 'a 'b = {
+  type ('a,'b) t = {
     name   : string;
     select : 'a -> 'b option;
   }

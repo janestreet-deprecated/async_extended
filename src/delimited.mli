@@ -1,6 +1,8 @@
 open Core.Std
 open Async.Std
 
+(** All readers defined below will raise if they encounter unparsable content. *)
+
 module Header : sig
   type t = [
     (* file has no header line, rows have no access by header *)
@@ -105,14 +107,39 @@ type ('a,'b) reader =
 (** proper csv file parsing is different than general delimited file parsing and requires
     special handling code *)
 module Csv : sig
-  (** [of_reader ?strip ~header r] returns a row pipe based on data read from the provided
-      reader. *)
-  val of_reader : (Header.t, ?sep:char -> Reader.t -> Row.t Pipe.Reader.t) reader
+  (** [create_manual ?strip ~header r] returns a function that allows you to
+      feed strings into it, receiving back the rows as they are finished.
+
+      It is explicitly allowed to pass Eof, then more data.  This is useful
+      when tailing a file or when joining multiple files together.
+  *)
+  val create_manual
+    :  ?strip:bool
+    -> ?sep:char
+    -> header:Header.t
+    -> unit
+    -> ([`Data of string | `Eof] -> Row.t list) Staged.t
+
+  (** [of_reader ?strip ~header r] returns a row pipe based on data read from
+      the provided reader.
+  *)
+  val of_reader
+    : ?strip:bool
+    -> ?skip_lines:int
+    -> ?sep:char
+    -> header:Header.t
+    -> Reader.t
+    -> Row.t Pipe.Reader.t
 
   (** [create_reader ?strip ~header filename] same as of_reader, but creates the reader
       for you *)
-  val create_reader :
-    (Header.t, ?sep:char -> string -> Row.t Pipe.Reader.t Deferred.t) reader
+  val create_reader
+    : ?strip:bool
+    -> ?skip_lines:int
+    -> ?sep:char
+    -> header:Header.t
+    -> string
+    -> Row.t Pipe.Reader.t Deferred.t
 
   val of_writer : ?sep:char -> Writer.t -> string list Pipe.Writer.t
   val create_writer : ?sep:char -> string -> string list Pipe.Writer.t Deferred.t

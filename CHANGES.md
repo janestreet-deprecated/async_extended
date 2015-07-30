@@ -1,3 +1,7 @@
+## 113.00.00
+
+- Added a more raw interface to `Delimited.Csv`.
+
 ## 112.35.00
 
 - Added `Ltl` module, an implementation of linear temporal logic, which

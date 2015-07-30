@@ -1,7 +1,7 @@
 (* Sieve of Eratosthenes as a process network *)
 (* code adapted from Reppy's CML book *)
 
-open Core.Std
+open Core_kernel.Std
 open Async_extended.Std
 open Async_extended.Std.Cml
 

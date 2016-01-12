@@ -27,10 +27,10 @@ let term_or_kill pid_spec =
   | `No_such_process -> ()
   | `Permission_denied -> ()
   | `Ok ->
-     after (sec 1.) >>> fun () ->
-     (* SIGKILL is handled by the OS: the process is removed from the scheduler and the
-        memory freed and the process is not given the opportunity to perform cleanup. *)
-     ignore (Signal.send Signal.kill pid_spec)
+    after (sec 1.) >>> fun () ->
+    (* SIGKILL is handled by the OS: the process is removed from the scheduler and the
+       memory freed and the process is not given the opportunity to perform cleanup. *)
+    ignore (Signal.send Signal.kill pid_spec)
 ;;
 
 module Kill_at_shutdown : sig
@@ -76,9 +76,9 @@ let create ?kill:kill_def ?(kill_how=`by_pid)
     let create_fd name file_descr =
       Fd.create Fd.Kind.Fifo file_descr
         (Info.create "child process" (name, `pid pid, `prog prog, `args args)
-           (<:sexp_of<
+           ([%sexp_of:
                string * [ `pid of Pid.t ] * [ `prog of string ] * [ `args of string list ]
-            >>))
+            ]))
     in
     let stdin  = Writer.create (create_fd "stdin"  stdin ) in
     let stdout = Reader.create (create_fd "stdout" stdout) in
@@ -221,7 +221,7 @@ module Lines_or_sexp = struct
   type t =
   | Lines of string list
   | Sexp of Sexp.t
-  with sexp_of
+  [@@deriving sexp_of]
 
   let create string =
     try Sexp (Sexp.of_string (String.strip string))
@@ -237,9 +237,9 @@ module Command_failed = struct
       stdout : Lines_or_sexp.t;
       stderr : Lines_or_sexp.t;
     }
-  with sexp_of
+  [@@deriving sexp_of]
 
-  exception E of t with sexp
+  exception E of t [@@deriving sexp]
 end
 
 let backtick_new ?kill ?env ~prog ~args ?working_dir ?stdin () =

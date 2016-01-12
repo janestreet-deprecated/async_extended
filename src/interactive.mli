@@ -11,6 +11,8 @@ val printf          : ('r, unit, string, unit Deferred.t) format4 -> 'r
 
 val prints : string -> 'a -> ('a -> Sexp.t) -> unit Deferred.t
 
+val print_s : Sexp.t -> unit Deferred.t
+
 val ask_dispatch_gen
   :  f:(string -> ('a, string) Result.t)
   -> string

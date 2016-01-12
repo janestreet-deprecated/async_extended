@@ -44,6 +44,8 @@ end
 (* LTL checker over sequences of State.t *)
 module Make (State : State) : sig
   module Field : sig
+    (* Due to the use of [Univ_map] internally, the ['a] should be
+       polymorphically comparable. *)
     type 'a t
 
     val create
@@ -56,7 +58,7 @@ module Make (State : State) : sig
   end
 
   module Variable : sig
-    type 'a t with compare
+    type 'a t [@@deriving compare]
 
     (** [create ?sexp_of name] creates a variable named [name]. The name is only
         used for debugging and error printing purposes. Every variable is unique,
@@ -100,7 +102,7 @@ module Make (State : State) : sig
       such formulas along with formulas in which an argument of a [next]
       operator is not defined on empty sequences - see [validate] below for
       details. *)
-  type t with sexp_of
+  type t [@@deriving sexp_of]
 
   (*-----------------
     Primitives

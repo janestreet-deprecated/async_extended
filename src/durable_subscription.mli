@@ -9,7 +9,7 @@ open Async.Std
 module Update : sig
   type ('response, 'error) t =
     | Attempting_new_connection
-    | Connection_success of Rpc.Pipe_rpc.Id.t
+    | Connection_success of Rpc.Pipe_rpc.Metadata.t
     | Lost_connection
     | Failed_to_connect of Error.t
     | Rpc_error of 'error

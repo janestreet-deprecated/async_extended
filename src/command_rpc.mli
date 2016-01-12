@@ -15,23 +15,24 @@ module Command : sig
   end
 
   module type T = sig
-    type query    with of_sexp
-    type response with sexp_of
+    type query    [@@deriving of_sexp]
+    type response [@@deriving sexp_of]
     val rpc : (query, response) Rpc.Rpc.t
     val implementation : Invocation.t -> query -> response Deferred.t
   end
 
   module type T_conv = sig
-    include Versioned_rpc.Both_convert.Plain.S
-    val query_of_sexp    : Sexp.t -> callee_query
-    val sexp_of_response : callee_response -> Sexp.t
-    val implementation : Invocation.t -> callee_query -> callee_response Deferred.t
+    include Versioned_rpc.Callee_converts.Rpc.S
+    val name : string
+    val query_of_sexp    : Sexp.t -> query
+    val sexp_of_response : response -> Sexp.t
+    val implementation : Invocation.t -> query -> response Deferred.t
   end
 
   module type T_pipe = sig
-    type query    with of_sexp
-    type response with sexp_of
-    type error    with sexp_of
+    type query    [@@deriving of_sexp]
+    type response [@@deriving sexp_of]
+    type error    [@@deriving sexp_of]
     val rpc : (query, response, error) Rpc.Pipe_rpc.t
     val implementation
       :  Invocation.t

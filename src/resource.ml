@@ -22,18 +22,18 @@ module Raw = struct
 
     let noop = { release = fun () -> Deferred.return () }
 
-    TEST_MODULE = struct
-      TEST_UNIT "check calls alert" =
+    let%test_module _ = (module struct
+      let%test_unit "check calls alert" =
         Async_unix.Std.Thread_safe.block_on_async_exn (fun () ->
           let alerted = ref false in
           let _ = check ~alert:(fun () -> alerted := true) noop in
           Gc.compact ();
           Clock.after (Time.Span.of_ms 1.) >>= fun () ->
-          <:test_result<bool>> ~expect:true (!alerted);
+          [%test_result: bool] ~expect:true (!alerted);
           return ()
         )
 
-      TEST_UNIT "check doesn't call alert" =
+      let%test_unit "check doesn't call alert" =
         Async_unix.Std.Thread_safe.block_on_async_exn (fun () ->
           let alerted = ref false in
           let _ =
@@ -42,10 +42,10 @@ module Raw = struct
           in
           Gc.compact ();
           Clock.after (Time.Span.of_ms 1.) >>= fun () ->
-          <:test_result<bool>> ~expect:false (!alerted);
+          [%test_result: bool] ~expect:false (!alerted);
           return ()
         )
-    end
+    end)
   end
 
   type ('a, 'e) t =
@@ -179,7 +179,7 @@ include Monad.Make2 (struct
   type nonrec ('a, 'e) t = ('a, 'e) t
 end)
 
-TEST_MODULE = struct
+let%test_module _ = (module struct
 
   let res_return = return
 
@@ -237,18 +237,18 @@ TEST_MODULE = struct
       >>= fun h ->
       Handle.release h
 
-  TEST_UNIT "Counter works" =
+  let%test_unit "Counter works" =
     Thread_safe.block_on_async_exn (fun () ->
       let counter = (mk_counter ~limit:2) in
       test_counter ~limit:2 counter)
 
-  TEST_UNIT "map ~f:Fn.id = Fn.id" =
+  let%test_unit "map ~f:Fn.id = Fn.id" =
     Thread_safe.block_on_async_exn (fun () ->
       let counter = (mk_counter ~limit:2) in
       let counter = map ~f:Fn.id counter in
       test_counter ~limit:2 counter)
 
-  TEST_UNIT "map_error ~f:Fn.id = Fn.id" =
+  let%test_unit "map_error ~f:Fn.id = Fn.id" =
     Thread_safe.block_on_async_exn (fun () ->
       let counter = (mk_counter ~limit:2) in
       let counter = map_error ~f:Fn.id counter in
@@ -260,7 +260,7 @@ TEST_MODULE = struct
     | Error _ -> return ()
     | Ok _ -> failwith "should have failed"
 
-  TEST_UNIT "[map] recovers from exceptions"=
+  let%test_unit "[map] recovers from exceptions"=
     Thread_safe.block_on_async_exn (fun () ->
       let counter = mk_counter ~limit:2 in
       let bad_counter = map ~f:(fun _ -> failwith "failed") counter in
@@ -268,7 +268,7 @@ TEST_MODULE = struct
       >>= fun () ->
       test_counter ~limit:2 counter)
 
-  TEST_UNIT "[map_error] recovers from exceptions" =
+  let%test_unit "[map_error] recovers from exceptions" =
     Thread_safe.block_on_async_exn (fun () ->
       let counter = mk_counter ~limit:2 in
       let bad_counter = map_error ~f:(fun _ -> failwith "failed") counter in
@@ -279,14 +279,14 @@ TEST_MODULE = struct
       Handle.release h2 >>= fun () ->
       test_counter ~limit:2 counter)
 
-  TEST_UNIT "x >>= return = x" =
+  let%test_unit "x >>= return = x" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:2 in
       let resource2 = bind resource1 res_return in
       test_counter ~limit:2 resource2
     )
 
-  TEST_UNIT "return () >>= f = f ()" =
+  let%test_unit "return () >>= f = f ()" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:2 in
       let f () = resource1 in (* f must be side-effect-free, which mk_counter isn't *)
@@ -295,7 +295,7 @@ TEST_MODULE = struct
     )
 
 
-  TEST_UNIT "bind 2 3" =
+  let%test_unit "bind 2 3" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:2 in
       let resource2 = mk_counter ~limit:3 in
@@ -305,7 +305,7 @@ TEST_MODULE = struct
       test_counter ~limit:2 resource
     )
 
-  TEST_UNIT "bind 3 2" =
+  let%test_unit "bind 3 2" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:3 in
       let resource2 = mk_counter ~limit:2 in
@@ -315,14 +315,14 @@ TEST_MODULE = struct
       test_counter ~limit:2 resource
     )
 
-  TEST_UNIT "bind yourself" =
+  let%test_unit "bind yourself" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:5 in
       let resource = bind resource1 (fun _n -> resource1) in
       test_counter ~limit:2 (map ~f:(fun x -> x / 2) resource)
     )
 
-  TEST_UNIT "bind recovers from exceptions in f" =
+  let%test_unit "bind recovers from exceptions in f" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:3 in
       let resource2 = bind resource1 (fun _n -> failwith "failed") in
@@ -331,7 +331,7 @@ TEST_MODULE = struct
       test_counter ~limit:3 resource1
     )
 
-  TEST_UNIT "bind recovers from exceptions in acquire" =
+  let%test_unit "bind recovers from exceptions in acquire" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:3 in
       let resource2 = bind resource1 (fun _n -> create (fun () -> failwith "failed")) in
@@ -397,11 +397,11 @@ TEST_MODULE = struct
     cnt_should_be 2;
     return ()
 
-  TEST_UNIT "memo works" =
+  let%test_unit "memo works" =
     Thread_safe.block_on_async_exn (fun () ->
       let module M = Memo(Int) in
       let cnt = ref 0 in
-      let cnt_should_be n = <:test_result<int>> ~expect:n (!cnt) in
+      let cnt_should_be n = [%test_result: int] ~expect:n (!cnt) in
       let counter0 = mk_counter ~limit:1 in
       let counter1 = mk_counter ~limit:1 in
       let failed1 = ref false in
@@ -434,7 +434,7 @@ TEST_MODULE = struct
       memo_key_supposed_to_raise ~cnt_should_be memoed 3
     )
 
-  TEST_UNIT "with_ succeed" =
+  let%test_unit "with_ succeed" =
     Thread_safe.block_on_async_exn (fun () ->
       let res = mk_counter ~limit:1 in
       with_ res ~f:(fun n ->
@@ -442,20 +442,20 @@ TEST_MODULE = struct
         >>= fun () ->
         return n)
       >>= fun result ->
-      <:test_result<(int, unit) Result.t>> ~expect:(Ok 1) result;
+      [%test_result: (int, unit) Result.t] ~expect:(Ok 1) result;
       test_counter ~limit:1 res
     )
 
-  TEST_UNIT "with_ fail" =
+  let%test_unit "with_ fail" =
     Thread_safe.block_on_async_exn (fun () ->
       let res = mk_counter ~limit:0 in
       with_ res ~f:(fun n -> return n)
       >>= fun res ->
-      <:test_result<(int, unit) Result.t>> ~expect:(Error ()) res;
+      [%test_result: (int, unit) Result.t] ~expect:(Error ()) res;
       return ()
     )
 
-  TEST_UNIT "with_ raise" =
+  let%test_unit "with_ raise" =
     Thread_safe.block_on_async_exn (fun () ->
       let res = mk_counter ~limit:1 in
       expect_async_fail (fun () ->
@@ -463,6 +463,6 @@ TEST_MODULE = struct
       ) >>= fun () ->
       test_counter ~limit:1 res
     )
-end
+end)
 
 let create = create'

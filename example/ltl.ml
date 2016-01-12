@@ -8,7 +8,7 @@ open Async_extended.Std
 
 module Kind = struct
   type t = [ `Request | `Response ]
-  with compare, sexp
+  [@@deriving compare, sexp]
 
   let hash = Hashtbl.hash
 end
@@ -18,7 +18,7 @@ module State = struct
     { kind : Kind.t
     ; time : Time.t
     ; tag : int
-    } with sexp, fields
+    } [@@deriving sexp, fields]
 
   let to_string t =
     Sexp.to_string (sexp_of_t t)

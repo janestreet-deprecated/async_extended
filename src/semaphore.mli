@@ -3,7 +3,7 @@
 open Core.Std
 open Async.Std
 
-type t with sexp_of
+type t [@@deriving sexp_of]
 
 include Invariant.S with type t := t
 

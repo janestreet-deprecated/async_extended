@@ -80,9 +80,11 @@ let printf fmt = ksprintf print_string fmt
 
 let prints message a sexp_of_a =
   print_endline ((message, a)
-                 |> <:sexp_of< string * a >>
+                 |> [%sexp_of: string * a]
                  |> Sexp.to_string_hum)
 ;;
+
+let print_s sexp = print_endline (sexp |> Sexp.to_string_hum)
 
 let read_line () = Reader.read_line (force Reader.stdin)
 
@@ -111,7 +113,7 @@ let choose_dispatch (type a) ~(dispatch : (char * a) list)
     begin match List.filter dispatch ~f:(fun (c, _) -> Char.is_uppercase c) with
     | _ :: _ :: _ as l ->
       failwiths "[Interactive.choose_dispatch] supplied multiple defaults"
-        (List.map l ~f:fst) <:sexp_of< char list >>
+        (List.map l ~f:fst) [%sexp_of: char list]
     | [ _, a ] -> return (Ok a)
     | [] ->
       printf "Invalid empty reply.\n"

@@ -17,11 +17,17 @@ let file_list ~inc ~exc path =
   Find.to_list (Find.create ~options path)
 ;;
 
-let _ =
-  let path, pattern = (Varg.parse2 ()) in
-  upon (file_list ~inc:pattern ~exc:None path) (fun file_list ->
-    List.iter file_list ~f:(fun (file, _) -> Print.printf "%s\n%!" file);
-    shutdown 0;
-  );
-  never_returns (Scheduler.go ())
+let () =
+  Command.async' ~summary:"simple find like tool"
+    (let module Let_syntax = Command.Let_syntax in
+     let%map_open
+       path    = anon ("PATH"    %: file) and
+       pattern = anon ("PATTERN" %: string)
+     in
+     fun () ->
+       file_list ~inc:pattern ~exc:None path
+       >>= fun file_list ->
+       List.iter file_list ~f:(fun (file, _) -> Print.printf "%s\n%!" file);
+       Deferred.unit)
+  |> Command.run
 ;;

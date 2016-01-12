@@ -92,7 +92,7 @@ module Stats = struct
     last_second : float;
     last_minute : float;
     since_start : float;
-  } with sexp
+  } [@@deriving sexp]
 
 end
 

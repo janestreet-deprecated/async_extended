@@ -99,7 +99,7 @@ module Make (State: State) = struct
       { id : 'a Type_equal.Id.t
       ; get : State.t -> 'a option
       ; hashable : 'a Hashtbl.Hashable.t
-      } with fields
+      } [@@deriving fields]
 
     let create ~name ~get hashable =
       let id = Type_equal.Id.create ~name hashable.Hashtbl.Hashable.sexp_of_t in
@@ -107,6 +107,11 @@ module Make (State: State) = struct
 
     let name t =
       Type_equal.Id.name t.id
+
+    let compare t1 t2 =
+      Type_equal.Id.Uid.compare
+        (Type_equal.Id.uid t1.id)
+        (Type_equal.Id.uid t2.id)
 
     let same t1 t2 =
       Type_equal.Id.same t1.id t2.id
@@ -139,7 +144,7 @@ module Make (State: State) = struct
 
     module Id = struct
       module T = struct
-        type t = string * Uid.t with compare
+        type t = string * Uid.t [@@deriving compare]
 
         let sexp_of_t (name, _) =
           Sexp.Atom name
@@ -155,8 +160,11 @@ module Make (State: State) = struct
     let id t =
       to_string t, Type_equal.Id.uid t
 
-    let compare _ t1 t2 =
+    let compare_uids t1 t2 =
       Uid.compare (uid t1) (uid t2)
+
+    let compare _ t1 t2 =
+      compare_uids t1 t2
   end
 
   module Assignment = Univ_map
@@ -224,7 +232,7 @@ module Make (State: State) = struct
       }
 
     let sexp_of_t t =
-      <:sexp_of<string option>> t.description
+      [%sexp_of: string option] t.description
 
     let eval t state values =
       Expression.eval t.exp state values
@@ -240,8 +248,9 @@ module Make (State: State) = struct
   type t =
     | True
     | False
-    | Predicate     of Predicate.t
-    | Not_predicate of Predicate.t
+    (* Tag predicates so we can define a comparison function *)
+    | Predicate     of int * Predicate.t
+    | Not_predicate of int * Predicate.t
     | Eq     : 'a Variable.t * 'a Field.t -> t
     | Not_eq : 'a Variable.t * 'a Field.t -> t
     | And of t list
@@ -256,7 +265,88 @@ module Make (State: State) = struct
     | Weak_now    of t
     | Until   of t * t
     | Release of t * t
-  with sexp_of
+  [@@deriving sexp_of]
+
+  (* No [with compare] for GADTs, so I auto-generated the comparison function
+     for a modified type and tweaked it. We could go by constructing an
+     intermediate value first, but I'm not keen on allocating a new value just
+     for comparison.  *)
+  let rec compare t1 t2 =
+    let rec loop =
+      function
+      | a ->
+        (function
+          | b ->
+            (match (a, b) with
+             | ([],[]) -> 0
+             | ([],_) -> (-1)
+             | (_,[]) -> 1
+             | (x::xs,y::ys) ->
+               let n = compare x y in
+               if Pervasives.(=) n 0
+               then loop xs ys
+               else n))
+    in
+    if phys_equal t1 t2 then 0
+    else begin
+      match t1, t2 with
+      | True, True -> 0
+      | True, _    -> (-1)
+      | _,    True -> 1
+      | False, False -> 0
+      | False, _     -> (-1)
+      | _,     False -> 1
+      | Predicate (id1, _), Predicate (id2, _) ->
+        Int.compare id1 id2
+      | Predicate _, _  -> (-1)
+      | _, Predicate _ -> 1
+      | Not_predicate (id1, _), Not_predicate (id2, _) ->
+        Int.compare id1 id2
+      | Not_predicate _, _ -> (-1)
+      | _, Not_predicate _ -> 1
+      | Eq (v1, field1), Eq (v2, field2) ->
+        let ret = Variable.compare_uids v1 v2 in
+        if ret <> 0 then ret
+        else Field.compare field1 field2
+      | Eq _, _ -> (-1)
+      | _, Eq _ -> 1
+      | Not_eq (v1, field1), Not_eq (v2, field2) ->
+        let ret = Variable.compare_uids v1 v2 in
+        if ret <> 0 then ret
+        else Field.compare field1 field2
+      | Not_eq _, _ -> (-1)
+      | _, Not_eq _ -> 1
+      | And ts1, And ts2 ->
+        loop ts1 ts2
+      | And _, _ -> (-1)
+      | _, And _ -> 1
+      | Or ts1, Or ts2 ->
+        loop ts1 ts2
+      | Or _, _ -> (-1)
+      | _, Or _ -> 1
+      | Delay t1, Delay t2 ->
+        compare t1 t2
+      | Delay _, _ -> (-1)
+      | _, Delay _ -> 1
+      | Now t1, Now t2 ->
+        compare t1 t2
+      | Now _, _ -> (-1)
+      | _, Now _ -> 1
+      | Weak_now t1, Weak_now t2 ->
+        compare t1 t2
+      | Weak_now _, _ -> (-1)
+      | _, Weak_now _ -> 1
+      | Until (a1, b1), Until (a2, b2) ->
+        let ret = compare a1 a2 in
+        if ret <> 0 then ret
+        else compare b1 b2
+      | Until _, _ -> (-1)
+      | _, Until _ -> 1
+      | Release (a1, b1), Release (a2, b2) ->
+        let ret = compare a1 a2 in
+        if ret <> 0 then ret
+        else compare b1 b2
+    end
 
   let to_string t =
     Sexp.to_string (sexp_of_t t)
@@ -287,8 +377,8 @@ module Make (State: State) = struct
   let rec negate = function
     | True -> False
     | False -> True
-    | Predicate p -> Not_predicate p
-    | Not_predicate p -> Predicate p
+    | Predicate (id, p) -> Not_predicate (id, p)
+    | Not_predicate (id, p) -> Predicate (id, p)
     | Eq (x,y) -> Not_eq (x,y)
     | Not_eq (x,y) -> Eq (x,y)
     | And xs -> Or (List.map xs ~f:negate)
@@ -343,8 +433,14 @@ module Make (State: State) = struct
   let next t = Now (Delay t)
   let now t = Now t
 
+  let predicate_id = ref 0
+
+  let next_predicate_id () =
+    incr predicate_id;
+    !predicate_id
+
   let predicate ?description exp =
-    Predicate {Predicate. description; exp}
+    Predicate (next_predicate_id (), {Predicate. description; exp})
 
   let has fld =
     let description = sprintf "has %s" (Field.name fld) in
@@ -415,7 +511,7 @@ module Make (State: State) = struct
       type t = Eq : 'a Field.t * 'a -> t
 
       module Sexp = struct
-        type t = Eq of Sexp.t * Sexp.t with sexp_of
+        type t = Eq of Sexp.t * Sexp.t [@@deriving sexp_of]
       end
 
       let sexp_of_t (Eq (field, value)) =
@@ -445,7 +541,7 @@ module Make (State: State) = struct
 
   module Constraint : sig
     type formula = t
-    type t with sexp_of
+    type t [@@deriving sexp_of]
     include Comparable with type t := t
     val create : formula -> t
     val step : t -> State.t -> t list
@@ -457,15 +553,18 @@ module Make (State: State) = struct
   end = struct
     open O
 
-    type formula = t with sexp_of
+    type formula = t [@@deriving sexp_of, compare]
 
     module T = struct
-      type t = formula * Assignment.t with sexp_of
+      module Assignment = struct
+        include Assignment
+        let compare = Polymorphic_compare.compare
+      end
+
+      type t = formula * Assignment.t [@@deriving sexp_of, compare]
 
       let t_of_sexp _ =
         failwith "Constraint.t_of_sexp undefined"
-
-      let compare = Polymorphic_compare.compare
     end
 
     include T
@@ -490,9 +589,9 @@ module Make (State: State) = struct
         match formula with
         | True  -> [True, values]
         | False -> []
-        | Predicate p ->
+        | Predicate (_, p) ->
           if Predicate.eval p state values then [True, values] else []
-        | Not_predicate p ->
+        | Not_predicate (_, p) ->
           if Predicate.eval p state values then [] else [True, values]
         | Eq (var, field) ->
           begin match Field.get field state with
@@ -597,19 +696,19 @@ module Make (State: State) = struct
   end
 
   module Sleeping_constraints : sig
-    type t with sexp_of
+    type t [@@deriving sexp_of]
     val create : unit -> t
     val num_guards : t -> int
     val to_list : t -> Constraint.t list
     val add : t -> Constraint.t -> [ `Added | `Not_added ]
     val wake_up : t -> State.t -> Constraint.t list
   end = struct
-    type field = Field : 'a Field.t -> field with sexp_of
+    type field = Field : 'a Field.t -> field [@@deriving sexp_of]
 
     type t =
       { mutable fields : field list
       ; sleeping : Constraint.Set.t Guard.Table.t
-      } with fields, sexp_of
+      } [@@deriving fields, sexp_of]
 
     let create () =
       { fields = []
@@ -629,9 +728,9 @@ module Make (State: State) = struct
       | None -> `Not_added
       | Some guards ->
         List.iter guards ~f:(fun ((Guard.Eq (field, _)) as guard) ->
-          Hashtbl.change t.sleeping guard (function
-            | None -> Some (Constraint.Set.singleton c)
-            | Some constraints -> Some (Set.add constraints c));
+          Hashtbl.update t.sleeping guard ~f:(function
+            | None -> Constraint.Set.singleton c
+            | Some constraints -> Set.add constraints c);
           let has_field =
             List.exists t.fields ~f:(fun (Field field') ->
               Field.same field field')
@@ -643,7 +742,7 @@ module Make (State: State) = struct
     let remove t c =
       let guards = Option.value_exn (Constraint.no_change_unless c) in
       List.iter guards ~f:(fun guard ->
-        Hashtbl.change t.sleeping guard (function
+        Hashtbl.change t.sleeping guard ~f:(function
           | None -> None
           | Some constraints ->
             let constraints = Set.remove constraints c in
@@ -668,7 +767,7 @@ module Make (State: State) = struct
   (** Represents a disjunction of multiple constraints *)
   module Constraints : sig
     type formula = t
-    type t with sexp_of
+    type t [@@deriving sexp_of]
     val create : formula -> t
     val is_empty : t -> bool
     val num_active : t -> int
@@ -683,7 +782,7 @@ module Make (State: State) = struct
     type t =
       { active : Constraint.t list
       ; sleeping : Sleeping_constraints.t
-      } with sexp_of
+      } [@@deriving sexp_of]
 
     let create formula =
       { active = [Constraint.create formula]
@@ -841,9 +940,9 @@ module Make (State: State) = struct
             failwithf
               !"Variable %s is not bound in subexpression %{sexp:t} of %{sexp:t}"
               (Variable.to_string v) t t_top ()
-        | Predicate p as t ->
+        | Predicate (_, p) as t ->
           check_predicate ~bound t p
-        | Not_predicate p as t ->
+        | Not_predicate (_, p) as t ->
           check_predicate ~bound t p
         | t ->
           iter_children t ~f:(check_single ~bound)
@@ -914,13 +1013,20 @@ module Make (State: State) = struct
             | Some debug -> Log.flushed debug
           end
           >>= fun () ->
-          Deferred.List.iter results ~f:(Pipe.write output)
-          >>= fun () ->
-          if Constraints.is_empty constraints || input = `Eof
-          then Deferred.return (Pipe.close_read input_pipe)
-          else loop constraints
+          if Pipe.is_closed output
+          then Deferred.unit
+          else begin
+            Pipe.transfer_in output ~from:(Queue.of_list results)
+            >>= fun () ->
+            if Constraints.is_empty constraints || input = `Eof
+            then Deferred.unit
+            else loop constraints
+          end
         in
-        loop (Constraints.create t))
+        loop (Constraints.create t)
+        >>= fun () ->
+        Pipe.close_read input_pipe;
+        Deferred.unit)
     in
     let open Or_error.Monad_infix in
     Normalize.normalize t
@@ -933,14 +1039,16 @@ module Make (State: State) = struct
     Or_error.map (query ?debug ?allow_nonmonotonic_times t input)
       ~f:(fun output ->
         Pipe.read output
-        >>| function
+        >>| fun res ->
+        Pipe.close_read output;
+        match res with
         | `Eof  -> false
         | `Ok _ -> true)
 end
 
-TEST_MODULE = struct
+let%test_module _ = (module struct
   module State = struct
-    type t = Time.t * int option with sexp, compare
+    type t = Time.t * int option [@@deriving sexp, compare]
     let to_string t = Sexp.to_string (sexp_of_t t)
     let time (time, _) = time
   end
@@ -972,7 +1080,7 @@ TEST_MODULE = struct
         | Some value -> Some (v, value))
 
     let compare t1 t2 =
-      <:compare<(int P.Variable.t * int) list>>
+      [%compare: (int P.Variable.t * int) list]
         (bindings t1)
         (bindings t2)
 
@@ -1018,9 +1126,9 @@ TEST_MODULE = struct
           true
         | False, _ ->
           false
-        | Predicate p, x :: _ ->
+        | Predicate (_, p), x :: _ ->
           Predicate.eval p x values
-        | Not_predicate p, x :: _ ->
+        | Not_predicate (_, p), x :: _ ->
           Pervasives.not (Predicate.eval p x values)
         | ( Predicate _ | Not_predicate _ | Eq _ | Not_eq _ | Delay _) as t, [] ->
           fail_empty t
@@ -1082,10 +1190,10 @@ TEST_MODULE = struct
         Naive.all_solutions t variables values data
         |> List.sort ~cmp:Assignment.compare
       in
-      <:test_result<Assignment.t list>> result ~expect:naive_result;
+      [%test_result: Assignment.t list] result ~expect:naive_result;
     end;
     Option.iter expect ~f:(fun expect ->
-      <:test_result<Assignment.t list>> result ~expect)
+      [%test_result: Assignment.t list] result ~expect)
 
   (* (1 | ... | 5){1, 5}. *)
   let all_permutations =
@@ -1117,7 +1225,7 @@ TEST_MODULE = struct
     Thread_safe.block_on_async_exn (fun () ->
       Or_error.ok_exn (P.eval t (Pipe.of_list states))
       >>| fun result ->
-      <:test_result<bool>> result ~expect)
+      [%test_result: bool] result ~expect)
 
   let test ?(skip_naive = false) t data ~expect =
     Thread_safe.block_on_async_exn (fun () ->
@@ -1150,50 +1258,55 @@ TEST_MODULE = struct
   let repeating_states_with_none =
     add_times [Some 1; None; Some 1; Some 1]
 
-  TEST_UNIT =
+  let%test_unit _ =
     test_eval (eventually (value_is 10)) states ~expect:false
 
-  TEST_UNIT =
+  let%test_unit _ =
     test_eval (always (not (value_is 10))) states ~expect:true
 
-  TEST_UNIT =
+  let%test_unit _ =
     test_eval (not (eventually (value_is 10))) states ~expect:true
 
-  TEST_UNIT =
+  let%test_unit _ =
     test_eval (eventually ((x == value) && eventually (not (x == value))))
       repeating_states ~expect:false
 
-  TEST_UNIT =
+  let%test_unit _ =
     test_eval (eventually ((x == value)
                            && eventually (not (x == value))))
       repeating_states_with_none ~expect:true
 
-  TEST_UNIT =
+  let%test_unit _ =
     test_eval (eventually ((x == value)
                            && eventually (has value && not (x == value))))
       repeating_states_with_none ~expect:false
 
-  TEST_UNIT =
+  let%test_unit _ =
+    test_eval (eventually (predicate (Expression.return true)
+                           || predicate (Expression.return true)))
+      repeating_states_with_none ~expect:true
+
+  let%test_unit _ =
     invalid (x == value)
 
-  TEST_UNIT =
+  let%test_unit _ =
     invalid (eventually (not (x == value)))
 
-  TEST_UNIT =
+  let%test_unit _ =
     test (eventually (not (x == value)
                       && x == value))
       states ~expect:[]
 
-  TEST_UNIT =
+  let%test_unit _ =
     test (eventually (x == value))
       states ~expect:[1; 2; 3; 4; 5]
 
-  TEST_UNIT =
+  let%test_unit _ =
     test (eventually ((x == value)
                       && eventually (not (x == value))))
       states ~expect:[1; 2; 3; 4]
 
-  TEST_UNIT =
+  let%test_unit _ =
     invalid (eventually ((x == value))
              && eventually (not (x == value)))
 
@@ -1216,80 +1329,80 @@ TEST_MODULE = struct
                 && not (eventually (before_var t ~add:span
                                     && gt x)))
 
-  TEST_UNIT =
+  let%test_unit _ =
     test ~skip_naive:true
       (followed_by_smaller_within (sec 0.1))
       states ~expect:[]
 
-  TEST_UNIT =
+  let%test_unit _ =
     test ~skip_naive:true
       (not_followed_by_smaller_within (sec 0.1))
       states ~expect:[1; 2; 3; 4; 5]
 
-  TEST_UNIT =
+  let%test_unit _ =
     test ~skip_naive:true
       (followed_by_smaller_within (sec 1.0))
       states ~expect:[2; 4]
 
-  TEST_UNIT =
+  let%test_unit _ =
     test ~skip_naive:true
       (not_followed_by_smaller_within (sec 1.0))
       (* 2 occurs both here and in the positive case. This is correct. *)
       states ~expect:[1; 2; 3; 5]
 
-  TEST_UNIT =
+  let%test_unit _ =
     test ~skip_naive:true
       (followed_by_smaller_within (sec 10.0))
       states ~expect:[2; 3; 4]
 
-  TEST_UNIT =
+  let%test_unit _ =
     test ~skip_naive:true
       (not_followed_by_smaller_within (sec 10.0))
       (* Absence of 2 here is correct. *)
       states ~expect:[1; 5]
 
-  TEST_UNIT =
+  let%test_unit _ =
     let next_is_two =
           eventually (x == value
                 && next (now (value_is 2)))
     in
     test next_is_two states ~expect:[4]
 
-  TEST_UNIT =
+  let%test_unit _ =
     let next_is_not_two =
           eventually (x == value
                 && not (next (now (value_is 2))))
     in
     test next_is_not_two states ~expect:[1; 2; 3; 5]
 
-  TEST_UNIT =
+  let%test_unit _ =
     let occurs_twice =
       eventually (x == value
                   && (next (eventually (x == value))))
     in
     test occurs_twice states ~expect:[2]
 
-  TEST_UNIT =
+  let%test_unit _ =
     let property = until (const true) (const false) in
     test property states ~expect:[]
 
-  TEST_UNIT =
+  let%test_unit _ =
     let property = until (const false) (const true) in
     test property states ~expect:[1; 2; 3; 4; 5]
 
-  TEST_UNIT =
+  let%test_unit _ =
     let property = release (const false) (const true) in
     test property states ~expect:[1; 2; 3; 4; 5]
 
-  TEST_UNIT =
+  let%test_unit _ =
     let property = release (const true) (const false) in
     test property states ~expect:[]
 
-  TEST_UNIT =
+  let%test_unit _ =
     let property =
       until
         (eventually (const true))
         (const false)
     in
     test property states ~expect:[]
-end
+end)

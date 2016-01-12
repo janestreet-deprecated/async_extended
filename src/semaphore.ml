@@ -5,10 +5,10 @@ type t =
   { mutable value: int;
     waiters: unit Ivar.t Queue.t;
   }
-with fields, sexp_of
+[@@deriving fields, sexp_of]
 
 let invariant t =
-  Invariant.invariant _here_ t <:sexp_of< t >> (fun () ->
+  Invariant.invariant [%here] t [%sexp_of: t] (fun () ->
     let check f = Invariant.check_field t f in
     Fields.iter
       ~value:(check (fun value -> assert (value >= 0)))
@@ -18,7 +18,7 @@ let invariant t =
 
 let create init =
   if init <= 0 then
-    failwiths "Semaphore.create got a nonpositive value" init <:sexp_of< int >>;
+    failwiths "Semaphore.create got a nonpositive value" init [%sexp_of: int];
   { value = init;
     waiters = Queue.create ();
   }
@@ -47,11 +47,11 @@ let resource t =
     ~acquire:(fun () -> decr t >>| fun () -> Ok ())
     ~release:(fun () -> incr t; return ())
 
-TEST_MODULE = struct
+let%test_module _ = (module struct
   let stabilize = Async_kernel.Scheduler.run_cycles_until_no_jobs_remain
 
   (* check if we go to sleep on negative counts *)
-  TEST_UNIT =
+  let%test_unit _ =
     let test n =
       let t = create n in
       let rec loop n =
@@ -64,11 +64,11 @@ TEST_MODULE = struct
     for i = 1 to 20 do
       don't_wait_for (test i);
       stabilize ();
-    done;
+    done
   ;;
 
   (* check if we wakeup after sleeping *)
-  TEST_UNIT =
+  let%test_unit _ =
     let total_wakeups_per_job = 5 in
     let total_wakeups = ref 0 in
     let wakeups_ivar = Ivar.create () in
@@ -117,5 +117,5 @@ TEST_MODULE = struct
     assert (total_wakeups_per_job * total_jobs = !total_wakeups)
   ;;
 
-end
+end)
 

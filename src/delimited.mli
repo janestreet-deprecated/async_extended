@@ -26,10 +26,10 @@ end
 module Row : sig
   type t
 
-  (* [get_conv_exn t header _here_ conv] extract the cell with column
+  (* [get_conv_exn t header [%here] conv] extract the cell with column
      [header] from [row] and convert it using [conv].  If there is an
      error the error is raised including [row] [header] [error] and
-     the source code position (_here_). *)
+     the source code position ([%here]). *)
   val get_conv_exn : t -> string -> Source_code_position.t -> (string -> 'a) -> 'a
 
   (* [get_exn t header] return the column of the row corresponding to header *)
@@ -50,10 +50,10 @@ module Row : sig
   (* [nth_exn t i] return the ith column of t (indexed from 0) *)
   val nth_exn : t -> int -> string
 
-  (* [nth_conv_exn t i _here_ conv] extract the ith column of [t]
+  (* [nth_conv_exn t i [%here] conv] extract the ith column of [t]
      and convert it using [conv].  If there is an
      error the error is raised including [row] [i] [error] and
-     the source code position (_here_). *)
+     the source code position ([%here]). *)
   val nth_conv_exn : t -> int -> Source_code_position.t -> (string -> 'a) -> 'a
 
   (* [nth t i] same as nth_exn, but returns an option in the case where t does not have at

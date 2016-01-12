@@ -143,7 +143,7 @@ let tcp_server_generic
     using' ?buffer_age_limit sock ~f:(fun _r _w ->
       Socket.setopt sock Socket.Opt.reuseaddr true;
       Socket.bind sock addr >>= fun bound_sock ->
-      let server_sock = Socket.listen bound_sock ~max_pending_connections:500 in
+      let server_sock = Socket.listen bound_sock ~backlog:500 in
       Ivar.fill server_ready ();
       let rec accept_loop () =
         Socket.accept server_sock

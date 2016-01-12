@@ -1,0 +1,7 @@
+version = "$(pkg_version)"
+description = "Additional utilities for async"
+requires = "async async_find async_inotify async_shell bin_prot camlzip core core_extended fieldslib ppx_assert.runtime-lib ppx_bench.runtime-lib ppx_expect.collector ppx_inline_test.runtime-lib sexplib textutils typerep variantslib"
+archive(byte          ) = "async_extended.cma"
+archive(native        ) = "async_extended.cmxa"
+archive(native, plugin) = "async_extended.cmxs"
+exists_if = "async_extended.cma"

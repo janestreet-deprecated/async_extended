@@ -7,23 +7,24 @@ module Command = struct
   end
 
   module type T = sig
-    type query    with of_sexp
-    type response with sexp_of
+    type query    [@@deriving of_sexp]
+    type response [@@deriving sexp_of]
     val rpc : (query, response) Rpc.Rpc.t
     val implementation : Invocation.t -> query -> response Deferred.t
   end
 
   module type T_conv = sig
-    include Versioned_rpc.Both_convert.Plain.S
-    val query_of_sexp    : Sexp.t -> callee_query
-    val sexp_of_response : callee_response -> Sexp.t
-    val implementation : Invocation.t -> callee_query -> callee_response Deferred.t
+    include Versioned_rpc.Callee_converts.Rpc.S
+    val name : string
+    val query_of_sexp    : Sexp.t -> query
+    val sexp_of_response : response -> Sexp.t
+    val implementation : Invocation.t -> query -> response Deferred.t
   end
 
   module type T_pipe = sig
-    type query    with of_sexp
-    type response with sexp_of
-    type error    with sexp_of
+    type query    [@@deriving of_sexp]
+    type response [@@deriving sexp_of]
+    type error    [@@deriving sexp_of]
     val rpc : (query, response, error) Rpc.Pipe_rpc.t
     val implementation
       :  Invocation.t
@@ -71,7 +72,7 @@ module Command = struct
     rpc_name : string;
     version : int;
     query : Sexp.t;
-  } with sexp
+  } [@@deriving sexp]
 
   let write_sexp w sexp = Writer.write_sexp w sexp; Writer.newline w
 
@@ -79,7 +80,7 @@ module Command = struct
     let stdout = Lazy.force Writer.stdout in
     if show_menu then
       let menu_sexp =
-        <:sexp_of<(string * int) list>> (Map.keys (menu impls))
+        [%sexp_of: (string * int) list] (Map.keys (menu impls))
       in
       write_sexp stdout menu_sexp;
       return `Success
@@ -166,21 +167,54 @@ module Connection = struct
     ?propagate_stderr:bool (* defaults to true *) -> prog:string -> args:string list -> 'a
 
   let transfer_stderr child_stderr =
-    don't_wait_for begin
-      Reader.transfer child_stderr (Writer.pipe (Lazy.force Writer.stderr))
-      >>= fun () ->
-      Reader.close child_stderr
-    end
+    Reader.transfer child_stderr (Writer.pipe (Lazy.force Writer.stderr))
+    >>= fun () ->
+    Reader.close child_stderr
 
-  let reap pid = don't_wait_for (Deferred.ignore (Unix.waitpid pid))
+  let validate_program_name prog =
+    let fail message =
+      Deferred.Or_error.error "Command_rpc.Connection.connect" () (fun () ->
+        [%sexp { reason = (message : string) ; filename = (prog : string) }])
+    in
+    if Filename.is_relative prog
+    then fail "filename is not absolute"
+    else
+      begin
+        Sys.file_exists prog
+        >>= function
+        | `No | `Unknown -> fail "file does not exist"
+        | `Yes           ->
+          Unix.stat prog
+          >>= fun stat ->
+          if stat.perm land 0o111 = 0
+          then fail "file is not executable"
+          else Deferred.Or_error.ok_unit
+      end
 
   let connect_gen ~propagate_stderr ~prog ~args f =
+    validate_program_name prog
+    >>=? fun () ->
     Process.create ~prog ~args ()
     >>=? fun process ->
-    if propagate_stderr then
-      transfer_stderr (Process.stderr process);
-    reap (Process.pid process);
-    f ~stdin:(Process.stdin process) ~stdout:(Process.stdout process)
+    let stdin  = Process.stdin  process in
+    let stdout = Process.stdout process in
+    let stderr = Process.stderr process in
+    don't_wait_for begin
+      if propagate_stderr
+      then transfer_stderr stderr
+      else Reader.drain stderr
+    end;
+    (* This is mainly so that when a user closes the connection (which closes stdin and
+       stdout) we will also close stderr. *)
+    don't_wait_for begin
+      Writer.close_finished stdin
+      >>= fun () ->
+      Reader.close_finished stdout
+      >>= fun () ->
+      Reader.close stderr
+    end;
+    don't_wait_for (Deferred.ignore (Process.wait process));
+    f ~stdin ~stdout
   ;;
 
   let with_close ?(propagate_stderr=true) ~prog ~args dispatch_queries =

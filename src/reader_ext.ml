@@ -1,4 +1,3 @@
-
 open Core.Std
 module Process_in_this_dir = Process
 open Async.Std
@@ -17,12 +16,6 @@ let input_sexps reader =
     in
     loop []
   )
-
-let read_char reader =
-  read_until reader (`Pred (fun _ -> true)) ~keep_delim:true >>| function
-  | `Ok str -> `Ok str.[0]
-  | `Eof -> `Eof
-  | `Eof_without_delim _ -> assert false
 
 let gzip_is_ok = function
   | Error (`Signal s) when s = Signal.pipe -> true
@@ -58,12 +51,9 @@ let with_hadoop_gzip_file ~hadoop_file f =
 let with_xzip_file file ~f =
   with_input_from_process ~prog:"xzcat" ~args:["--stdout"; file] f
 
-
 let open_gzip_file file =
   Process.open_in ~is_ok:gzip_is_ok ~prog:"gunzip" ~args:["--to-stdout"; file] ()
   >>= fun {Process.Output.stdout = stdout; stderr} ->
   Reader.close stderr
   >>= fun () ->
   return stdout
-
-

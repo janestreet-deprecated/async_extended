@@ -97,10 +97,10 @@ module Timed_out_waiting_for = struct
     { filter : string;
       debug : string sexp_option;
       mailbox : Sexp.t;
-    } with sexp
+    } [@@deriving sexp]
 end
 
-exception Timed_out_waiting_for of Timed_out_waiting_for.t with sexp
+exception Timed_out_waiting_for of Timed_out_waiting_for.t [@@deriving sexp]
 
 (* There are now two modes of operation:  swallow or not.  swallow means
    that every element prior to the last element found that satisfies our
@@ -168,10 +168,10 @@ module Matched_more_than_expected = struct
       expected : int;
       received : int;
       mailbox : Sexp.t;
-    } with sexp
+    } [@@deriving sexp]
 end
 
-exception Matched_more_than_expected of Matched_more_than_expected.t with sexp
+exception Matched_more_than_expected of Matched_more_than_expected.t [@@deriving sexp]
 
 let many ?debug ?timeout ?swallow t n f =
   receive ?debug ?timeout ?swallow t ~filter:f ~postcond:(fun l ->
@@ -226,7 +226,7 @@ let check_clear t =
   else
     Or_error.error "Unconsumed msgs" (describe_in_sexp t) Fn.id
 
-TEST_MODULE = struct
+let%test_module _ = (module struct
 
   module Dummy = struct
     type nonrec 'a t =
@@ -278,13 +278,13 @@ TEST_MODULE = struct
     in
     aux 1
 
-  TEST_UNIT =
-    Thread_safe.block_on_async_exn (fun () -> loop 100 ~swallow:true);
+  let%test_unit _ =
+    Thread_safe.block_on_async_exn (fun () -> loop 100 ~swallow:true)
 
-  TEST_UNIT =
-    Thread_safe.block_on_async_exn (fun () -> loop 100 ~swallow:false);
+  let%test_unit _ =
+    Thread_safe.block_on_async_exn (fun () -> loop 100 ~swallow:false)
 
-  TEST_UNIT =
+  let%test_unit _ =
     Thread_safe.block_on_async_exn (fun () ->
       let dummy = Dummy.create () in
       Dummy.write dummy 3
@@ -305,4 +305,4 @@ TEST_MODULE = struct
       | Ok _ -> assert false
       | _ -> Or_error.ok_exn (check_clear dummy.mailbox))
 
-end
+end)

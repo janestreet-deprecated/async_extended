@@ -66,7 +66,7 @@ let stabilize_gc () =
 let full_major_cost ~now () =
   let count = 10 in
   let s = now () in
-  for _i = 1 to count do
+  for _ = 1 to count do
     Gc.full_major ();
   done;
   let e = now () in

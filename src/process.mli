@@ -1,7 +1,7 @@
 (** This module is deprecated; please use [Async.Std.Process]. *)
 
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 module Output : sig
   type 'a t = {

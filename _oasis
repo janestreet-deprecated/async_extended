@@ -2,7 +2,7 @@ OASISFormat:           0.4
 OCamlVersion:          >= 4.02.3
 FindlibVersion:        >= 1.3.2
 Name:                  async_extended
-Version:               113.24.00
+Version:               113.33.00
 Synopsis:              Additional utilities for async
 Authors:               Jane Street Group, LLC <opensource@janestreet.com>
 Copyrights:            (C) 2013-2016 Jane Street Group LLC <opensource@janestreet.com>
@@ -36,7 +36,6 @@ Library async_extended
                 Deferred_cache,
                 Deferred_list,
                 Delimited,
-                Deprecated_async_bench,
                 Durable,
                 Durable_subscription,
                 Embedded_script,
@@ -59,11 +58,13 @@ Library async_extended
                 Ref,
                 Resource,
                 Rpc_proxy,
+                Run_in_fork,
                 Safe_pipe,
                 Semaphore,
                 Shell,
                 Shutdown,
                 Signal,
+                Simple_tcp_proxy,
                 Sound,
                 Std,
                 Synccast,

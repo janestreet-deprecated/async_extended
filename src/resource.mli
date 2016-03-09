@@ -22,8 +22,8 @@
    We say that activation [a] is enclosed into activation [b] whenever
    [a] begins before [b] and [a] ends after [b]
 *)
-open Core.Std
-open Async_kernel.Std
+open! Core.Std
+open! Async_kernel.Std
 
 module Raw : sig
   (**

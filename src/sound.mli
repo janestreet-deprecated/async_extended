@@ -1,5 +1,5 @@
 
-open Async.Std
+open! Async.Std
 
 type t
 

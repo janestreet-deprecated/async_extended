@@ -1,5 +1,5 @@
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 (** Using linear temporal logic (LTL) to run online queries on sequences of
     states. A state is a record and the formula talks about values of the fields

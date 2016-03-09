@@ -1,5 +1,5 @@
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 (* a synccast is a multicast stream where each event is fully processed by all listeners
 before any processing of subsequent events begins *)

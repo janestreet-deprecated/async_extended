@@ -1,7 +1,7 @@
 (** Utilities for RPC communication with a child process over stdin and stdout. *)
 
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 (** [Command] is used for setting up an RPC server in the child process.  By default this
     will set up an RPC server, but passing the [-sexp] flag will make it run the
@@ -37,7 +37,6 @@ module Command : sig
     val implementation
       :  Invocation.t
       -> query
-      -> aborted: unit Deferred.t
       -> (response Pipe.Reader.t, error) Result.t Deferred.t
   end
 

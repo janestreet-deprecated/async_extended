@@ -1,4 +1,4 @@
-open Async.Std
+open! Async.Std
 
 val percent_fds_in_use : unit -> float Deferred.t
 

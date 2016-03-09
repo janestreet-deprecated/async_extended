@@ -20,7 +20,7 @@ let main file () =
 
 let () =
   Command.async' ~summary:"cat a compressed file"
-    (let module Let_syntax = Command.Let_syntax in
+    (let open Command.Let_syntax in
      let%map_open file = anon ("FILE-NAME" %: file) in
      main file)
   |> Command.run

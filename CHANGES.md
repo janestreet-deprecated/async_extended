@@ -1,3 +1,31 @@
+## 113.33.00
+
+- Create library to fork and do calculations in child process.
+
+- `Command_rpc.with_close` returns an `Or_error.t Deferred.t`, and indeed if it
+  fails to execute the binary, it will return an `Error _` rather than raising.
+  However, if it successfully executes the binary but then the handshake fails,
+  it raises an exception. Successfully executing the binary but then having the
+  handshake fail is I think a reasonable thing to want to catch, as it's what
+  you'll get if you are starting the command rpc slave via ssh and there's some
+  problem on the remote side.
+
+  I haven't thought very hard about what happens if the subprocess dies after
+  successful handshake and/or the implications of the Writer's monitor being the
+  monitor in effect when `with_close` is called. I think heartbeats will kill the
+  connection before this becomes an issue.
+
+- Remove `Async_extended.Deprecated_async_bench`
+
+  It's causing problems for the open-source release on platforms that don't have
+  `Posix_clock.gettime`:
+
+      https://github.com/janestreet/async_extended/issues/1
+
+  Seems that a module with Deprecated in the name and no uses should just be binned.
+
+- add a simple tcp proxy that is useful in testing for simulating network issues
+
 ## 113.24.00
 
 - Make LTL predicates comparable by tagging and id to each one. Fixes a

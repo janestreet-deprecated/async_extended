@@ -1,5 +1,5 @@
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 (** Erlang style mailboxes built on top of async streams *)
 type 'a t

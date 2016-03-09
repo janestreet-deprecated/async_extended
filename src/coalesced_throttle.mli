@@ -1,5 +1,5 @@
 (** A throttle that coalesces jobs, only fully executing the most recent job. *)
-open Async.Std
+open! Async.Std
 
 (** A coalesced throttle. *)
 type 'a t

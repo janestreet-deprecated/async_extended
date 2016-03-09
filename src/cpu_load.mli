@@ -1,4 +1,4 @@
-open Core.Std
+open! Core.Std
 
 (** [start ()] starts measuring CPU load.  It uses an async thread that checks
  * the CPU use every second and maintains stats.

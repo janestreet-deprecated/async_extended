@@ -1,5 +1,5 @@
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 (** elements with smaller priority number will be poped first *)
 type ('elt,'priority) t

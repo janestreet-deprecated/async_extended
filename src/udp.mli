@@ -6,8 +6,8 @@
   - unlike the low level unix functions these collect errors and throw them as exceptions
 *)
 
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 (** [udp_server addr port f] except that f is called on every packet received with the
     address it was recieved from and the data received. The next packet will not be read

@@ -29,7 +29,6 @@ module Command = struct
     val implementation
       :  Invocation.t
       -> query
-      -> aborted : unit Deferred.t
       -> (response Pipe.Reader.t, error) Result.t Deferred.t
   end
 
@@ -127,7 +126,7 @@ module Command = struct
               `Success
             | `Pipe (module T) ->
               let query = T.query_of_sexp call.query in
-              T.implementation Sexp query ~aborted:(Deferred.never ())
+              T.implementation Sexp query
               >>= function
               | Error e ->
                 write_sexp stdout (T.sexp_of_error e);
@@ -223,7 +222,7 @@ module Connection = struct
         Rpc.Connection.with_close
           stdout stdin
           ~connection_state:(fun _ -> ())
-          ~on_handshake_error:`Raise
+          ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
           ~dispatch_queries)
   ;;
 

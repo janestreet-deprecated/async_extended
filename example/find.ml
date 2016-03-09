@@ -19,7 +19,7 @@ let file_list ~inc ~exc path =
 
 let () =
   Command.async' ~summary:"simple find like tool"
-    (let module Let_syntax = Command.Let_syntax in
+    (let open Command.Let_syntax in
      let%map_open
        path    = anon ("PATH"    %: file) and
        pattern = anon ("PATTERN" %: string)

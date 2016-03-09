@@ -1,5 +1,5 @@
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 (* [create ~start_on ~check_interval ~change_interval on_failure] starts a
    pair of async events and a thread that has expectations about those events.

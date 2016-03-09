@@ -1,5 +1,5 @@
-open Core.Std
-open Async.Std
+open! Core.Std
+open! Async.Std
 
 (* This module is designed to help processess maintain update subscriptions that will
    automatically recover from lost connections. It exposes to the client when the

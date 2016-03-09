@@ -1,6 +1,6 @@
-open Core.Std
+open! Core.Std
 open Textutils.Std
-open Async.Std
+open! Async.Std
 
 module Console : sig
   (** returns a [Log.Output.t] given optional styles (i.e. values of type [Ansi.t list])

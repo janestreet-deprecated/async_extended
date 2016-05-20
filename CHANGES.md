@@ -1,3 +1,121 @@
+## 113.43.00
+
+- Added `Pipe.create_reader`, which is like `Pipe.init`, but has different
+  behavior w.r.t. `f` raising.  It forces the caller to choose the behavior
+  on raise to avoid subtle bugs related to closing the reading end.
+  The comment recommends `~close_on_exception:false`.
+
+    val create_reader
+      :  close_on_exception:bool
+      -> ('a Writer.t -> unit Deferred.t)
+      -> 'a Reader.t
+
+  `Pipe.init_reader` was renamed to `Pipe.create_writer` so that the names are
+  consistent.  Its behaviour was not changed: it also closes the pipe if `f`
+  raises, but here this is probably what you want, so that the writer is notified
+  that the reader is dead.
+
+  Changed `Pipe.of_sequence`, which is implemented with `create_reader`,
+  to use `~close_on_exception:false`.  This seems like an improvement, because
+  it won't treat raising as end of sequence.
+
+  Changed `Pipe.unfold`, which is implemented with `create_reader`, to use
+  the `~close_on_exception:false`.  This shouldn't be a problem, because
+  `unfold` is barely used.  And it was never specified what `f` raising
+  means.  It seems fine to not treat raising as end-of-sequence, because
+  `unfold` already has a way to express end-of-sequence.
+
+  Here's some more explanation of motivation for the change.  In the
+  current world, `Pipe.init` looks like this:
+
+    let init f =
+      let r, w = create () in
+      don't_wait_for (Monitor.protect (fun () -> f w)
+                        ~finally:(fun () -> close w; Deferred.unit));
+      r
+    ;;
+
+  This means that if `f` raises, then the pipe is both closed and the
+  exception is sent to the monitor active when `init` was called.
+
+  If you have something (like `Pipe.fold_without_pushback`) consuming
+  the pipe, the exception being delivered can race against the fold
+  finishing, and you could end up missing it. Moreover, the race seems
+  to reliably go in the direction you don't want:
+
+    $ cat pipes.ml
+    #!/j/office/app/jane-script/prod/113.34/jane-script run
+    open Core.Std
+    open Async.Std
+
+    let main () =
+      Monitor.try_with_or_error (fun () ->
+        Pipe.init (fun _writer -> assert false)
+        |> Pipe.fold_without_pushback ~init:() ~f:(fun () () -> ())
+      )
+      >>= fun res ->
+      printf !"Result: %{sexp:unit Or_error.t}\n" res;
+      exit 0
+
+    let () =
+      don't_wait_for (main ());
+      never_returns (Scheduler.go ())
+
+    $ ./pipes.ml
+    Result: (Ok ())
+    2015-10-21 15:42:22.494737+01:00 Error Exception raised to Monitor.try_with that already returned
+      (monitor.ml.Error_
+      ((exn "Assert_failure /home/toto/pipes.ml:7:30")
+    `snip`
+
+- Deprecated `Pipe.init` and replaced its uses with the semantically
+  equivalent:
+
+    Pipe.create_reader ~close_on_exception:true
+
+- Add a generic validate command that validates config files against their type
+
+- Add a convenience function to Delimited to read off a string
+
+- Add `Mailbox.sexp_of_t`. It shows elements in the order they were added,
+  ie like `peek { select = always_select }` would return.
+
+- The requirement that the binary path you give to `Command_rpc` is
+  slightly inconvenient and seems not very useful. Let's remove it.
+
+- Remove the ~update argument from State_rpc.dispatch.
+
+  Before this feature, the dispatch method for State_rpcs looked like this:
+
+    val dispatch
+      :  ('query, 'state, 'update, 'error) t
+      -> Connection.t
+      -> 'query
+      -> update : ('state -> 'update -> 'state)
+      -> ( 'state * ('state * 'update) Pipe.Reader.t * Metadata.t
+         , 'error
+         ) Result.t Or_error.t Deferred.t
+
+  There are a couple of cases where having the `update` method there can be
+  cumbersome:
+  - sometimes the type of the state that it sent over the wire is different
+  from the type that is naturally maintained on the client side.
+  - sometimes the update method needs to perform some Async computation to
+  return a new state.
+
+  It feels like the method is trying to be helpful, but has more of a tendency
+  of getting in the way. This feature removes this method.
+
+  The old API may be reinstated by using a `Pipe.fold_map` as below:
+
+    State_rpc.dispatch rpc connection query
+    >>|? fun (state, update_pipe, pipe_metadata) ->
+    state,
+    Pipe.fold_map pipe ~init:state ~f:(fun state update ->
+      let new_state = update_state state update in
+      new_state, (new_state, update)),
+    pipe_metadata
+
 ## 113.33.00
 
 - Create library to fork and do calculations in child process.
@@ -116,4 +234,3 @@
 ## 112.01.00
 
 - Clarified an error in `Rpc_proxy`.
-

@@ -175,20 +175,15 @@ module Connection = struct
       Deferred.Or_error.error "Command_rpc.Connection.connect" () (fun () ->
         [%sexp { reason = (message : string) ; filename = (prog : string) }])
     in
-    if Filename.is_relative prog
-    then fail "filename is not absolute"
-    else
-      begin
-        Sys.file_exists prog
-        >>= function
-        | `No | `Unknown -> fail "file does not exist"
-        | `Yes           ->
-          Unix.stat prog
-          >>= fun stat ->
-          if stat.perm land 0o111 = 0
-          then fail "file is not executable"
-          else Deferred.Or_error.ok_unit
-      end
+    Sys.file_exists prog
+    >>= function
+    | `No | `Unknown -> fail "file does not exist"
+    | `Yes           ->
+      Unix.stat prog
+      >>= fun stat ->
+      if stat.perm land 0o111 = 0
+      then fail "file is not executable"
+      else Deferred.Or_error.ok_unit
 
   let connect_gen ~propagate_stderr ~prog ~args f =
     validate_program_name prog

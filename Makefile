@@ -2,7 +2,7 @@
 
 SETUP := setup.exe
 NAME := async_extended
-PREFIX = $(shell grep ^prefix= setup.data | cut -d\" -f 2)
+PREFIX ?= $(shell grep ^prefix= setup.data | cut -d\" -f 2)
 
 # Default rule
 default: build

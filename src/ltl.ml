@@ -1002,7 +1002,7 @@ module Make (State: State) = struct
         results, constraints
     in
     let output t =
-      Pipe.init (fun output ->
+      Pipe.create_reader ~close_on_exception:true (fun output ->
         let rec loop constraints =
           Pipe.read input_pipe
           >>= fun input ->

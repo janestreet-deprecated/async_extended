@@ -61,7 +61,8 @@ end
  *     )
  *
  * let map_pipe pipe ~fields =
- *   Pipe.init (fun writer ->
+ *
+ *   Pipe.create_reader ~close_on_exception:true (fun writer ->
  *     Monitor.protect ~finally:(fun () -> Pipe.close_read pipe; Deferred.unit) (fun () ->
  *       Pipe.read pipe
  *       >>= function
@@ -487,53 +488,53 @@ module Csv = struct
           raise (Bad_csv_formatting (Queue.to_list current_row, Buffer.contents field))
         end
       | `Data (buffer, n) ->
-          for i = 0 to n - 1 do
-            let c = buffer.[i] in
-            if c <> '\r' then
-              match !state with
-              | StartField ->
-                if      c = '\"'      then state := InQuotedField
-                else if c = separator then emit_field ()
-                else if c = '\n'      then (emit_field (); emit_row ())
-                else begin
-                  Buffer.add_char field c;
-                  state := InUnquotedField
-                end
-              | InUnquotedField ->
-                begin
-                  if c = separator then
-                    (emit_field (); state := StartField)
-                  else if c = '\n' then (
-                    emit_field ();
-                    emit_row ();
-                    state := StartField)
-                  else Buffer.add_char field c
-                end
-              | InQuotedField ->
-                if c = '\"' then
-                  state := InQuotedFieldAfterQuote
-                else
-                  Buffer.add_char field c
-              | InQuotedFieldAfterQuote ->
-                if c = '\"' then ( (* doubled quote *)
-                  Buffer.add_char field c;
-                  state := InQuotedField)
-                else if c = '0' then (
-                  Buffer.add_char field '\000';
-                  state := InQuotedField)
-                else if c = separator then (
-                  emit_field ();
-                  state := StartField)
+        for i = 0 to n - 1 do
+          let c = buffer.[i] in
+          if c <> '\r' then
+            match !state with
+            | StartField ->
+              if      c = '\"'      then state := InQuotedField
+              else if c = separator then emit_field ()
+              else if c = '\n'      then (emit_field (); emit_row ())
+              else begin
+                Buffer.add_char field c;
+                state := InUnquotedField
+              end
+            | InUnquotedField ->
+              begin
+                if c = separator then
+                  (emit_field (); state := StartField)
                 else if c = '\n' then (
                   emit_field ();
                   emit_row ();
                   state := StartField)
-                else if Char.is_whitespace c then ()
-                else
-                  failwithf "InQuotedFieldAfterQuote looking at '%c' (lineno=%d)"
-                    c (!lineno) ()
-          done;
-          flush_rows ())
+                else Buffer.add_char field c
+              end
+            | InQuotedField ->
+              if c = '\"' then
+                state := InQuotedFieldAfterQuote
+              else
+                Buffer.add_char field c
+            | InQuotedFieldAfterQuote ->
+              if c = '\"' then ( (* doubled quote *)
+                Buffer.add_char field c;
+                state := InQuotedField)
+              else if c = '0' then (
+                Buffer.add_char field '\000';
+                state := InQuotedField)
+              else if c = separator then (
+                emit_field ();
+                state := StartField)
+              else if c = '\n' then (
+                emit_field ();
+                emit_row ();
+                state := StartField)
+              else if Char.is_whitespace c then ()
+              else
+                failwithf "InQuotedFieldAfterQuote looking at '%c' (lineno=%d)"
+                  c (!lineno) ()
+        done;
+        flush_rows ())
   ;;
 
   let create_manual
@@ -545,6 +546,15 @@ module Csv = struct
     stage (function
       | `Eof    -> process `Eof
       | `Data s -> process (`Data (s, String.length s)))
+  ;;
+
+  let parse_string
+        ?strip
+        ?sep
+        ~header
+        s =
+    let process = unstage (create_chunk_processor ?strip ~header ?sep ()) in
+    List.concat_map [`Data (s, String.length s); `Eof] ~f:process
   ;;
 
   let of_reader
@@ -751,3 +761,19 @@ module Positional = struct
     of_writer w header ?strict
   ;;
 end
+
+let%test_unit "parse_string no headers" =
+  let rows = Csv.parse_string ~sep:'|' ~header:`No "alpha|beta" in
+  [%test_result: string list list] ~expect:[["alpha"; "beta"]]
+    (List.map rows ~f:Row.to_list)
+;;
+
+let%test_unit "parse_string headers" =
+  let rows = Csv.parse_string ~sep:'|' ~header:`Yes "foo|bar\nalpha|beta" in
+  match rows with
+  | [ row ] ->
+    [%test_result: string option] ~expect:(Some "alpha") (Row.get row "foo");
+    [%test_result: string option] ~expect:(Some "beta") (Row.get row "bar")
+  | _ ->
+    failwithf "unexpected number of rows %d, expected 1" (List.length rows) ()
+;;

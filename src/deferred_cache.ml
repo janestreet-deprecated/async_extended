@@ -94,13 +94,10 @@ let find t ~key =
     then cache_and_return data
     else data
   in
-  match Hashtbl.find t.cache key with
-  | Some data -> return (Cached_data.read ~now data)
-  | None ->
-    Keyed_sequencer.enqueue t.sequencer ~key (fun () ->
-      match Hashtbl.find t.cache key with
-      | Some data -> return (Cached_data.read ~now data)
-      | None -> try_to_add t ~key)
+  Keyed_sequencer.enqueue t.sequencer ~key (fun () ->
+    match Hashtbl.find t.cache key with
+    | Some data -> return (Cached_data.read ~now data)
+    | None -> try_to_add t ~key)
 
 let find_cached_only t ~key =
   Option.bind (Hashtbl.find t.cache key) (fun data ->

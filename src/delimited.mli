@@ -143,6 +143,13 @@ module Csv : sig
 
   val of_writer : ?sep:char -> Writer.t -> string list Pipe.Writer.t
   val create_writer : ?sep:char -> string -> string list Pipe.Writer.t Deferred.t
+
+  val parse_string
+    :  ?strip:bool
+    -> ?sep:char
+    -> header:Header.t
+    -> string
+    -> Row.t list
 end
 
 module Positional : sig

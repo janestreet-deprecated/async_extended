@@ -40,12 +40,11 @@ let state_proxy :
     Rpc.State_rpc.implement rpc
       (fun connection query ->
          raise_on_closed_connection connection;
-         Rpc.State_rpc.dispatch rpc connection query ~update:(fun s _ -> s)
+         Rpc.State_rpc.dispatch rpc connection query
          >>= function
          | Error error -> Error.raise error
          | Ok (Error error) -> return (Error error)
          | Ok (Ok (state, pipe, _id)) ->
-           let pipe = Pipe.map pipe ~f:(fun (_s, u) -> u) in
            return (Ok (state, pipe))
       )
 

@@ -2,7 +2,7 @@ open! Core.Std
 open! Async.Std
 
 (** Erlang style mailboxes built on top of async streams *)
-type 'a t
+type 'a t [@@deriving sexp_of]
 
 module Filter : sig
   type ('a, 'b) t = {

@@ -7,6 +7,9 @@ type 'a t = {
   msg_to_sexp : ('a -> Sexp.t) option;
 }
 
+let sexp_of_t sexp_of_a t =
+  [%sexp_of: a list] (List.rev t.data)
+
 module Filter = struct
   type ('a,'b) t = {
     name   : string;

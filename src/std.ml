@@ -37,4 +37,5 @@ module Shutdown               = Shutdown
 module Simple_tcp_proxy       = Simple_tcp_proxy
 module Sound                  = Sound
 module Udp                    = Udp
+module Validate_command       = Validate_command
 module Watcher                = Watcher

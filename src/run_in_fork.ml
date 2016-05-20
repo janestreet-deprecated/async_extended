@@ -67,7 +67,7 @@ module Multiple = struct
       >>| fun () ->
       `Finished ()
     in
-    Pipe.init (fun writer ->
+    Pipe.create_reader ~close_on_exception:true (fun writer ->
       let pipe_closed = Deferred.choice (Pipe.closed writer) (fun () -> Done) in
       Deferred.repeat_until_finished () (fun () ->
         Deferred.choose

@@ -10,7 +10,7 @@ open! Core.Std
 open! Async.Std
 
 (** [udp_server addr port f] except that f is called on every packet received with the
-    address it was recieved from and the data received. The next packet will not be read
+    address it was received from and the data received. The next packet will not be read
     until the Deferred returned by f is determined *)
 val udp_server : addr:string
   -> port:int

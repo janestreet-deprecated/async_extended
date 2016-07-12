@@ -59,13 +59,16 @@ module Command = struct
     | `Duplicate_key (name, version) ->
       failwithf "multiple implementations of rpc (%s %d)" name version ()
 
-  let implementations : t -> Invocation.t Rpc.Implementation.t list = function
-    | `Plain (module T) ->
-      [Rpc.Rpc.implement T.rpc T.implementation]
-    | `Plain_conv (module T) ->
-      T.implement_multi (fun s ~version:_ q -> T.implementation s q)
-    | `Pipe (module T) ->
-      [Rpc.Pipe_rpc.implement T.rpc T.implementation]
+  let implementations ?log_not_previously_seen_version
+    : t -> Invocation.t Rpc.Implementation.t list
+    = function
+      | `Plain (module T) ->
+        [Rpc.Rpc.implement T.rpc T.implementation]
+      | `Plain_conv (module T) ->
+        T.implement_multi ?log_not_previously_seen_version
+          (fun s ~version:_ q -> T.implementation s q)
+      | `Pipe (module T) ->
+        [Rpc.Pipe_rpc.implement T.rpc T.implementation]
 
   type call = {
     rpc_name : string;
@@ -75,7 +78,7 @@ module Command = struct
 
   let write_sexp w sexp = Writer.write_sexp w sexp; Writer.newline w
 
-  let main impls ~show_menu mode =
+  let main ?log_not_previously_seen_version impls ~show_menu mode =
     let stdout = Lazy.force Writer.stdout in
     if show_menu then
       let menu_sexp =
@@ -91,8 +94,10 @@ module Command = struct
           match
             Rpc.Implementations.create
               ~on_unknown_rpc:`Raise
-              ~implementations:(Versioned_rpc.Menu.add
-                                  (List.concat_map ~f:implementations impls))
+              ~implementations:
+                (Versioned_rpc.Menu.add
+                   (List.concat_map ~f:(implementations ?log_not_previously_seen_version)
+                      impls))
           with
           | Error (`Duplicate_implementations _) -> return `Failure
           | Ok implementations ->
@@ -150,20 +155,26 @@ module Command = struct
   let menu_doc = " dump a sexp representation of the rpc menu"
   let sexp_doc = " speak sexp instead of bin-prot"
 
-  let create ~summary impls =
+  let create ?log_not_previously_seen_version ~summary impls =
     Command.basic ~summary
       Command.Spec.(
         empty
         +> flag "-menu" no_arg ~doc:menu_doc
         +> flag "-sexp" no_arg ~doc:sexp_doc)
       (fun show_menu sexp () ->
-        async_main (main impls ~show_menu (if sexp then `Sexp else `Bin_prot)))
+         async_main
+           (main ?log_not_previously_seen_version impls ~show_menu
+              (if sexp then `Sexp else `Bin_prot)))
 
 end
 
 module Connection = struct
-  type 'a with_connection_args =
-    ?propagate_stderr:bool (* defaults to true *) -> prog:string -> args:string list -> 'a
+  type 'a with_connection_args
+    =  ?propagate_stderr : bool        (* defaults to true *)
+    -> ?env              : Process.env (* defaults to [`Extend []] *)
+    -> prog              : string
+    -> args              : string list
+    -> 'a
 
   let transfer_stderr child_stderr =
     Reader.transfer child_stderr (Writer.pipe (Lazy.force Writer.stderr))
@@ -185,10 +196,10 @@ module Connection = struct
       then fail "file is not executable"
       else Deferred.Or_error.ok_unit
 
-  let connect_gen ~propagate_stderr ~prog ~args f =
+  let connect_gen ~propagate_stderr ~env ~prog ~args f =
     validate_program_name prog
     >>=? fun () ->
-    Process.create ~prog ~args ()
+    Process.create ~prog ~args ~env ()
     >>=? fun process ->
     let stdin  = Process.stdin  process in
     let stdout = Process.stdout process in
@@ -211,8 +222,8 @@ module Connection = struct
     f ~stdin ~stdout
   ;;
 
-  let with_close ?(propagate_stderr=true) ~prog ~args dispatch_queries =
-    connect_gen ~propagate_stderr ~prog ~args
+  let with_close ?(propagate_stderr=true) ?(env=`Extend []) ~prog ~args dispatch_queries =
+    connect_gen ~propagate_stderr ~env ~prog ~args
       (fun ~stdin ~stdout ->
         Rpc.Connection.with_close
           stdout stdin
@@ -221,8 +232,8 @@ module Connection = struct
           ~dispatch_queries)
   ;;
 
-  let create ?(propagate_stderr = true) ~prog ~args () =
-    connect_gen ~propagate_stderr ~prog ~args
+  let create ?(propagate_stderr = true) ?(env=`Extend []) ~prog ~args () =
+    connect_gen ~propagate_stderr ~env ~prog ~args
       (fun ~stdin ~stdout ->
         Rpc.Connection.create
           stdout stdin

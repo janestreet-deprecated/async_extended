@@ -46,14 +46,19 @@ module Command : sig
     | `Pipe       of (module T_pipe)
   ]
 
-  val create : summary:string -> t list -> Command.t
+  val create
+    :  ?log_not_previously_seen_version : (name:string -> int -> unit)
+    -> summary                          : string
+    -> t list
+    -> Command.t
 end
 
 module Connection : sig
-  type 'a with_connection_args =
-    ?propagate_stderr:bool (* defaults to true *)
-    -> prog:string
-    -> args:string list
+  type 'a with_connection_args
+    =  ?propagate_stderr : bool        (* defaults to true *)
+    -> ?env              : Process.env (* defaults to [`Extend []] *)
+    -> prog              : string
+    -> args              : string list
     -> 'a
 
   (** [create] spawns a child process and returns an RPC connection that operates on the

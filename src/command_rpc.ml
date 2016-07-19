@@ -218,26 +218,32 @@ module Connection = struct
       >>= fun () ->
       Reader.close stderr
     end;
-    don't_wait_for (Deferred.ignore (Process.wait process));
-    f ~stdin ~stdout
+    let wait = Process.wait process in
+    f ~stdin ~stdout ~wait
   ;;
 
   let with_close ?(propagate_stderr=true) ?(env=`Extend []) ~prog ~args dispatch_queries =
     connect_gen ~propagate_stderr ~env ~prog ~args
-      (fun ~stdin ~stdout ->
-        Rpc.Connection.with_close
-          stdout stdin
-          ~connection_state:(fun _ -> ())
-          ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
-          ~dispatch_queries)
+      (fun ~stdin ~stdout ~wait ->
+         let%bind result =
+           Rpc.Connection.with_close
+             stdout stdin
+             ~connection_state:(fun _ -> ())
+             ~on_handshake_error:(`Call (fun exn -> return (Or_error.of_exn exn)))
+             ~dispatch_queries
+         in
+         let%bind exit_or_signal = wait in
+         ignore (exit_or_signal : Unix.Exit_or_signal.t);
+         return result)
   ;;
 
   let create ?(propagate_stderr = true) ?(env=`Extend []) ~prog ~args () =
     connect_gen ~propagate_stderr ~env ~prog ~args
-      (fun ~stdin ~stdout ->
-        Rpc.Connection.create
-          stdout stdin
-          ~connection_state:(fun _ -> ())
-        >>| Or_error.of_exn_result)
+      (fun ~stdin ~stdout ~wait ->
+         don't_wait_for (Deferred.ignore (wait : Unix.Exit_or_signal.t Deferred.t));
+         Rpc.Connection.create
+           stdout stdin
+           ~connection_state:(fun _ -> ())
+         >>| Or_error.of_exn_result)
   ;;
 end

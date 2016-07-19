@@ -93,7 +93,7 @@ let find_first_larger_or_equal t ~compare_with_target =
   >>= function
   | Error _ as error -> return error
   | Ok a ->
-    match compare_with_target a |! Ordering.of_int with
+    match compare_with_target a |> Ordering.of_int with
     | Equal -> return (Ok a)
     | Less -> find t ~f:(fun a -> compare_with_target a >= 0)
     | Greater ->

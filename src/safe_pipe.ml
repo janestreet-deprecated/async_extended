@@ -30,7 +30,7 @@ let queue_map_till_error ~f ~input queue =
     queue
     ~input
     ~f:(fun outqueue x -> Queue.enqueue outqueue (Ok (f x)))
-  |! Deferred.return
+  |> Deferred.return
 
 let queue_filter_map_till_error ~f ~input  queue =
   queue_transfer_till_error
@@ -40,7 +40,7 @@ let queue_filter_map_till_error ~f ~input  queue =
       match f x with
       | Some y -> Queue.enqueue outqueue (Ok y)
       | None -> ())
-  |! Deferred.return
+  |> Deferred.return
 
 
 let wrap_ok input = Pipe.map input ~f:(fun x -> Ok x)

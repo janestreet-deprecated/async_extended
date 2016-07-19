@@ -205,7 +205,7 @@ let not_empty ?debug ?timeout t f =
   receive ?debug ?timeout t ~filter:f ~postcond:(Fn.non List.is_empty)
 
 let peek t {Filter.select = f; _} =
-  List.map t.data ~f |! List.filter_map ~f:Fn.id |! List.rev
+  List.map t.data ~f |> List.filter_map ~f:Fn.id |> List.rev
 
 let filter t {Filter.select = f; _} =
   t.data <- List.filter t.data ~f:(fun x -> Option.is_none (f x))

@@ -147,7 +147,7 @@ let map t ~f =
 let map_error t ~f =
   create (fun () -> Deferred.Result.map_error (acquire t) ~f)
 
-let bind t f =
+let bind t ~f =
   create (fun () ->
     acquire t
     >>= function
@@ -282,7 +282,7 @@ let%test_module _ = (module struct
   let%test_unit "x >>= return = x" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:2 in
-      let resource2 = bind resource1 res_return in
+      let resource2 = bind resource1 ~f:res_return in
       test_counter ~limit:2 resource2
     )
 
@@ -290,7 +290,7 @@ let%test_module _ = (module struct
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:2 in
       let f () = resource1 in (* f must be side-effect-free, which mk_counter isn't *)
-      let resource2 = bind (res_return ()) f in
+      let resource2 = bind (res_return ()) ~f in
       test_counter ~limit:2 resource2
     )
 
@@ -299,7 +299,7 @@ let%test_module _ = (module struct
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:2 in
       let resource2 = mk_counter ~limit:3 in
-      let resource = bind resource1 (fun _n -> resource2) in
+      let resource = bind resource1 ~f:(fun _n -> resource2) in
       test_counter ~limit:2 resource
       >>= fun () ->
       test_counter ~limit:2 resource
@@ -309,7 +309,7 @@ let%test_module _ = (module struct
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:3 in
       let resource2 = mk_counter ~limit:2 in
-      let resource = bind resource1 (fun _n -> resource2) in
+      let resource = bind resource1 ~f:(fun _n -> resource2) in
       test_counter ~limit:2 resource
       >>= fun () ->
       test_counter ~limit:2 resource
@@ -318,14 +318,14 @@ let%test_module _ = (module struct
   let%test_unit "bind yourself" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:5 in
-      let resource = bind resource1 (fun _n -> resource1) in
+      let resource = bind resource1 ~f:(fun _n -> resource1) in
       test_counter ~limit:2 (map ~f:(fun x -> x / 2) resource)
     )
 
   let%test_unit "bind recovers from exceptions in f" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:3 in
-      let resource2 = bind resource1 (fun _n -> failwith "failed") in
+      let resource2 = bind resource1 ~f:(fun _n -> failwith "failed") in
       expect_async_fail (fun () -> acquire resource2)
       >>= fun () ->
       test_counter ~limit:3 resource1
@@ -334,7 +334,7 @@ let%test_module _ = (module struct
   let%test_unit "bind recovers from exceptions in acquire" =
     Thread_safe.block_on_async_exn (fun () ->
       let resource1 = mk_counter ~limit:3 in
-      let resource2 = bind resource1 (fun _n -> create (fun () -> failwith "failed")) in
+      let resource2 = bind resource1 ~f:(fun _n -> create (fun () -> failwith "failed")) in
       expect_async_fail (fun () -> acquire resource2)
       >>= fun () ->
       test_counter ~limit:3 resource1

@@ -100,5 +100,5 @@ let find t ~key =
     | None -> try_to_add t ~key)
 
 let find_cached_only t ~key =
-  Option.bind (Hashtbl.find t.cache key) (fun data ->
+  Option.bind (Hashtbl.find t.cache key) ~f:(fun data ->
     Result.ok (Cached_data.read data ~now:(Time.now ())))

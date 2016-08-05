@@ -1,0 +1,7 @@
+(executables
+ ((names (command_rpc find ltl zcat run_in_fork))
+  (libraries (
+    async
+    async_extended
+    core
+    pcre))))

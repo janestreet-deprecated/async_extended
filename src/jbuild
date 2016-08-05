@@ -1,0 +1,14 @@
+(library (
+  (name async_extended)
+  (public_name async_extended)
+  (libraries (
+    async
+    async_find
+    async_inotify
+    async_shell
+    camlzip
+    core
+    core_extended
+    textutils
+  ))
+))

@@ -609,27 +609,33 @@ module Csv = struct
 
   let write_field w field = Writer.write w (Csv_writer.maybe_escape_field field)
 
-  let rec write_line ~sep w line =
+  let rec write_line ~sep ~line_break w line =
     match line with
-    | [] -> Writer.write w "\r\n"
+    | [] -> Writer.write w line_break
     | [field] ->
       write_field w field;
-      write_line ~sep w []
+      write_line ~sep ~line_break w []
     | field :: rest ->
       write_field w field;
       Writer.write_char w sep;
-      write_line ~sep w rest
+      write_line ~sep ~line_break w rest
   ;;
 
-  let of_writer ?(sep=',') writer =
+  let of_writer ?(sep=',') ?(line_breaks = `Windows) writer =
+    let line_break =
+      match line_breaks with
+      | `Unix    -> "\n"
+      | `Windows -> "\r\n"
+    in
     let pipe_r, pipe_w = Pipe.create () in
-    don't_wait_for (Writer.transfer writer pipe_r (write_line ~sep writer));
+    don't_wait_for (Writer.transfer writer pipe_r (write_line ~sep ~line_break writer));
     pipe_w
   ;;
 
-  let create_writer ?sep filename =
-    Writer.open_file filename >>| fun w ->
-    of_writer ?sep w
+  let create_writer ?sep ?line_breaks filename =
+    Writer.open_file filename
+    >>| fun w ->
+    of_writer ?sep ?line_breaks w
   ;;
 end
 

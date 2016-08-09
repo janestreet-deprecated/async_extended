@@ -141,8 +141,17 @@ module Csv : sig
     -> string
     -> Row.t Pipe.Reader.t Deferred.t
 
-  val of_writer : ?sep:char -> Writer.t -> string list Pipe.Writer.t
-  val create_writer : ?sep:char -> string -> string list Pipe.Writer.t Deferred.t
+  val of_writer
+    :  ?sep:char
+    -> ?line_breaks:[`Unix|`Windows] (** default is [`Windows] *)
+    -> Writer.t
+    -> string list Pipe.Writer.t
+
+  val create_writer
+    : ?sep:char
+    -> ?line_breaks:[`Unix|`Windows] (** default is [`Windows] *)
+    -> string
+    -> string list Pipe.Writer.t Deferred.t
 
   val parse_string
     :  ?strip:bool

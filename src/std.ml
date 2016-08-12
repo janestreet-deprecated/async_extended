@@ -4,6 +4,7 @@ module Async_mutex            = Async_mutex
 module Coalesced_throttle     = Coalesced_throttle
 module Color_print            = Async_color_print
 module Command_rpc            = Command_rpc
+  [@@deprecated "[since 2016-08] Use the standalone Command_rpc library instead"]
 module Deferred_cache         = Deferred_cache
 module Deferred_list          = Deferred_list
 module Delimited              = Delimited
@@ -15,7 +16,8 @@ module Fd_leak_check          = Fd_leak_check
 module Find                   = Async_find
 module Run_in_fork            = Run_in_fork
 module Generator              = Generator
-module Interactive            = Interactive
+module Interactive            = Async_interactive
+  [@@deprecated "[since 2016-08] Use the standalone Async_interactive library instead"]
 module Keyed_sequencer        = Keyed_sequencer
 module Log = struct
   include Async.Std.Log

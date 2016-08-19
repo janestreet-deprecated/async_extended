@@ -87,6 +87,27 @@ module Row = struct
       size         : int;
     }
 
+  let equal t1 t2 =
+    Table.equal t1.header_index t2.header_index Int.equal
+    && Array.equal t1.data t2.data ~equal:String.equal
+    && Int.equal t1.size t2.size
+  ;;
+
+  let compare t1 t2 =
+    let data_cmp = Array.compare String.compare t1.data t2.data in
+    if data_cmp <> 0
+    then data_cmp
+    else
+      let header_cmp =
+        [%compare: (string * int) list]
+          (Table.to_alist t1.header_index)
+          (Table.to_alist t2.header_index)
+      in
+      if header_cmp <> 0
+      then header_cmp
+      else Int.compare t1.size t2.size
+  ;;
+
   let is_empty t =
     let rec loop i =
       if i >= Array.length t.data then true

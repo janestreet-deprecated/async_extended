@@ -5,6 +5,7 @@ module Coalesced_throttle     = Coalesced_throttle
 module Color_print            = Async_color_print
 module Command_rpc            = Command_rpc
   [@@deprecated "[since 2016-08] Use the standalone Command_rpc library instead"]
+module Csv                    = Csv
 module Deferred_cache         = Deferred_cache
 module Deferred_list          = Deferred_list
 module Delimited              = Delimited

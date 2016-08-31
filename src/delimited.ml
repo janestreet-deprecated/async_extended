@@ -15,68 +15,6 @@ module Header = struct
     | `Add of string list ]
 end
 
-
-(* (\* Fast efficient extraction of fields from a csv by header name. *\)
- * val map_fields:
- *   string list list
- *   -> fields:string array (\* names of columns to extract *\)
- *   -> f:(row:string list -> fields:string array -> 'a)
- *   -> 'a list
- * val map_pipe:
- *   string list Pipe.Reader.t
- *   -> fields:string array (\* names of columns to extract *\)
- *   -> (string list * string array) Pipe.Reader.t
- *
- * (\* Given the csv fields that are requested and the header that actually
- *    occurs in a csv file, create a mapping from field index -> column index *\)
- * let field_positions_of_header ~fields ~header =
- *   let header = List.mapi header ~f:(fun i x -> (i,x)) in
- *   Array.map fields ~f:(fun field ->
- *     match List.filter header ~f:(fun (_,fld) -> fld = field) with
- *     | [] -> failwithf "Header of csv does not contain field %s" field ()
- *     | [pos,_] -> pos
- *     | _ :: _ :: _ ->
- *       failwithf "Header of csv contains field %s more than once" field ()
- *   )
- *
- * (\* Given a field index -> column index mapping and a row of a csv file, extract
- *    out the desired fields. *\)
- * let extract_fields ~field_positions ~row =
- *   let arr = Array.of_list row in
- *   let len = Array.length arr in
- *   Array.map field_positions ~f:(fun pos ->
- *     if pos >= len
- *     then ""
- *     else arr.(pos)
- *   )
- *
- * let map_fields csv ~fields ~f =
- *   match csv with
- *   | [] -> []
- *   | header :: rows ->
- *     let field_positions = field_positions_of_header ~fields ~header in
- *     List.map rows ~f:(fun row ->
- *       let fields = extract_fields ~field_positions ~row in
- *       f ~row ~fields
- *     )
- *
- * let map_pipe pipe ~fields =
- *
- *   Pipe.create_reader ~close_on_exception:true (fun writer ->
- *     Monitor.protect ~finally:(fun () -> Pipe.close_read pipe; Deferred.unit) (fun () ->
- *       Pipe.read pipe
- *       >>= function
- *       | `Eof -> Deferred.unit
- *       | `Ok header ->
- *         let field_positions = field_positions_of_header ~fields ~header in
- *         Pipe.transfer pipe writer ~f:(fun row ->
- *           let fields = extract_fields ~field_positions ~row in
- *           (row,fields)
- *         )
- *     )
- *   ) *)
-
-
 module Row = struct
   module Table = String.Table
 

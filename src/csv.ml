@@ -6,18 +6,7 @@ module Csv_writer = Core_extended.Csv_writer
 (* the maximum read/write I managed to get off of a socket or disk was 65k *)
 let buffer_size = 10 * 65 * 1024
 
-module Fast_queue : sig
-  type 'a t
-
-  val create   : ?capacity : int -> unit -> 'a t
-  val of_list  : 'a list -> 'a t
-  val enqueue  : 'a t -> 'a -> unit
-  val nth_exn  : 'a t -> int -> 'a
-  val clear    : 'a t    -> unit
-  val to_list  : 'a t    -> 'a list
-  val to_array : 'a t    -> 'a array
-  val length   : 'a t    -> int
-end = struct
+module Fast_queue = struct
   (* Fast_queue is faster than Core_queue because it doesn't support dequeue, traversal,
      or detection of mutation during traversal. *)
   type 'a t =
@@ -265,26 +254,7 @@ let strip_buffer buf =
     | Some e -> Buffer.sub buf s (e - s + 1)
 ;;
 
-module Parse_state : sig
-  type 'a t
-
-  val acc : 'a t -> 'a
-
-  val create
-    :  ?strip : bool
-    -> ?sep : char
-    -> fields_used : int array option
-    -> init : 'a
-    -> f : (int -> 'a -> string Fast_queue.t -> 'a)
-    -> unit
-    -> 'a t
-
-  val input : 'a t -> ?len : int -> string -> 'a t
-
-  val finish : 'a t -> 'a t
-
-end = struct
-
+module Parse_state = struct
   module Step = struct
     type t =
       | Field_start
@@ -338,6 +308,19 @@ end = struct
     }
   ;;
 
+  let is_at_beginning_of_row t =
+    String.is_empty t.field
+    && List.is_empty t.current_row
+    && begin match t.step with
+      | Field_start -> true
+      | In_unquoted_field
+      | In_quoted_field
+      | In_quoted_field_after_quote
+        ->
+        false
+    end
+  ;;
+
   let mutable_of_t t =
     let field = Buffer.create (String.length t.field) in
     Buffer.add_string field t.field;
@@ -355,8 +338,10 @@ end = struct
   let should_enqueue fields_used current_field next_field_index =
     match fields_used with
     | None -> true
-    | Some array -> next_field_index < Array.length array
-                    && array.(next_field_index) = current_field
+    | Some array ->
+      next_field_index < Array.length array
+      && array.(next_field_index) = current_field
+  ;;
 
   let input t ?len input =
     let (field, current_row) = mutable_of_t t in
@@ -513,6 +498,23 @@ end = struct
   ;;
 end
 
+module On_invalid_row = struct
+
+  type 'a t = (int String.Map.t
+               -> string Fast_queue.t
+               -> exn
+               -> [ `Skip | `Yield of 'a | `Raise of exn ])
+
+  let raise _ _ exn = `Raise exn
+
+  let skip _ _ _ = `Skip
+
+  let create = Fn.id
+
+end
+
+type 'a on_invalid_row = 'a On_invalid_row.t
+
 module Builder = struct
   type _ t =
     | Column : int                                             -> string t
@@ -667,6 +669,7 @@ module Builder = struct
     in
     let transformed = transform t in
     Without_headers.build transformed
+  ;;
 
   let rec headers_used : type a. a t -> String.Set.t = function
     | Return _ -> String.Set.empty
@@ -694,7 +697,8 @@ module Header_parse : sig
   (** [input t ~len s] reads the first [len] bytes from [s] and returns either [t] or
       [header_map, unused_input]. *)
   val input : t -> len : int -> string -> (t, int String.Map.t * string) Either.t
-  val of_reader : t -> Reader.t -> (int String.Map.t * string) Deferred.t
+
+  val is_at_beginning_of_row : t -> bool
 end = struct
   (* This exception is used to return early from the parser, so we don't consume more
      input than necessary. This is almost [With_return], except declaring the exception at
@@ -705,6 +709,8 @@ end = struct
     { state : unit Parse_state.t
     ; transform : string array -> int String.Map.t
     }
+
+  let is_at_beginning_of_row t = Parse_state.is_at_beginning_of_row t.state
 
   let header_map header_row =
     Array.foldi header_row ~init:String.Map.empty ~f:(fun i map header ->
@@ -757,49 +763,72 @@ end = struct
       Second (t.transform row, String.sub input ~pos:offset ~len:(len - offset))
   ;;
 
-  let of_reader t r =
-    let buffer = String.create buffer_size in
-    Deferred.repeat_until_finished t (fun t ->
-      match%map Reader.read r buffer ~len:buffer_size with
-      | `Eof ->
-        raise_s [%message "header is incomplete" ~_:([%here] : Source_code_position.t)]
-      | `Ok len ->
-        match input t ~len buffer with
-        | First state -> `Repeat state
-        | Second (headers, input) -> `Finished (headers, input))
-  ;;
 end
 
-let fold_reader' ?strip ?skip_lines ?sep ?header ~builder ~init ~f r =
-  let create_parser_state header_map builder =
-    let (row_to_'a, fields_used) = Builder.build ~header_map builder in
-    let init = Queue.create ~capacity:(Map.length header_map) () in
-    let f _offset queue row =
-      Queue.enqueue queue (row_to_'a row);
-      queue
-    in
-    Parse_state.create ?strip ?sep ~fields_used ~init ~f ()
+let create_parse_state
+      ?strip ?sep ?(on_invalid_row=On_invalid_row.raise) header_map builder ~init ~f =
+  let (row_to_'a, fields_used) = Builder.build ~header_map builder in
+  let f _offset init row =
+    try f init (row_to_'a row) with exn ->
+    match on_invalid_row header_map row exn with
+    | `Yield x -> f init x
+    | `Skip -> init
+    | `Raise exn -> raise exn
   in
+  Parse_state.create ?strip ?sep ~fields_used ~init ~f ()
+;;
+
+let fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init ~f r =
   let%bind () = drop_lines r ?skip_lines in
-  let%bind state =
+  match%bind
     match Header_parse.create ?strip ?sep ?header builder with
-    | Second header_map -> return (create_parser_state header_map builder)
+    | Second header_map ->
+      return (Some (header_map, None))
     | First header_parse ->
-      let%map (header_map, trailing_input) = Header_parse.of_reader header_parse r in
-      Parse_state.input (create_parser_state header_map builder) trailing_input
-  in
-  let buffer = String.create buffer_size in
-  Deferred.repeat_until_finished (state, init) (fun (state, init) ->
-    match%bind Reader.read r buffer ~len:buffer_size with
-    | `Eof ->
-      let state = Parse_state.finish state in
-      let%map init = f init (Parse_state.acc state) in
-      `Finished init
-    | `Ok i ->
-      let state = Parse_state.input state buffer ~len:i in
-      let%map init = f init (Parse_state.acc state) in
-      Queue.clear (Parse_state.acc state);
-      `Repeat (state, init))
+      let buffer = String.create buffer_size in
+      Deferred.repeat_until_finished header_parse (fun header_parse ->
+        match%map Reader.read r buffer ~len:buffer_size with
+        | `Eof ->
+          if Header_parse.is_at_beginning_of_row header_parse
+          then `Finished None
+          else raise_s [%message
+                 "header is incomplete" ~_:([%here] : Source_code_position.t)]
+        | `Ok len ->
+          match Header_parse.input header_parse ~len buffer with
+          | First header_parse ->
+            `Repeat   header_parse
+          | Second (headers, input) ->
+            `Finished (Some (headers, Some input)))
+  with
+  | None ->
+    return init
+  | Some (header_map, trailing_input) ->
+    let state =
+      create_parse_state
+        ?strip
+        ?sep
+        ?on_invalid_row
+        header_map
+        builder
+        ~init:(Queue.create ())
+        ~f:(fun queue elt -> Queue.enqueue queue elt; queue)
+    in
+    let state =
+      Option.fold trailing_input ~init:state ~f:(fun state input ->
+        Parse_state.input state input)
+    in
+    let buffer = String.create buffer_size in
+    Deferred.repeat_until_finished (state, init) (fun (state, init) ->
+      match%bind Reader.read r buffer ~len:buffer_size with
+      | `Eof ->
+        let state = Parse_state.finish state in
+        let%map init = f init (Parse_state.acc state) in
+        `Finished init
+      | `Ok i ->
+        let state = Parse_state.input state buffer ~len:i in
+        let%map init = f init (Parse_state.acc state) in
+        Queue.clear (Parse_state.acc state);
+        `Repeat (state, init))
 ;;
 
 let bind_without_unnecessary_yielding x ~f =
@@ -808,21 +837,21 @@ let bind_without_unnecessary_yielding x ~f =
   | None -> Deferred.bind x ~f
 ;;
 
-let fold_reader ?strip ?skip_lines ?sep ?header ~builder ~init ~f r =
-  fold_reader' ?strip ?skip_lines ?sep ?header ~builder ~init r ~f:(fun acc queue ->
+let fold_reader ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init ~f r =
+  fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init r ~f:(fun acc queue ->
     Queue.fold queue ~init:(return acc) ~f:(fun deferred_acc row ->
       bind_without_unnecessary_yielding deferred_acc ~f:(fun acc -> f acc row)))
 ;;
 
-let fold_reader_without_pushback ?strip ?skip_lines ?sep ?header ~builder ~init ~f r =
-  fold_reader' ?strip ?skip_lines ?sep ?header ~builder ~init r ~f:(fun acc queue ->
+let fold_reader_without_pushback ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init ~f r =
+  fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init r ~f:(fun acc queue ->
     return (Queue.fold queue ~init:acc ~f))
 ;;
 
-let fold_reader_to_pipe ?strip ?skip_lines ?sep ?header ~builder reader =
+let fold_reader_to_pipe ?strip ?skip_lines ?sep ?header ?on_invalid_row builder reader =
   let r,w = Pipe.create () in
   let write_to_pipe : unit Deferred.t =
-    fold_reader' ?strip ?skip_lines ?sep ?header ~builder ~init:() reader
+    fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init:() reader
       ~f:(fun () queue -> Pipe.transfer_in w ~from:queue)
     >>= fun () ->
     return (Pipe.close w)
@@ -831,26 +860,34 @@ let fold_reader_to_pipe ?strip ?skip_lines ?sep ?header ~builder reader =
   r
 ;;
 
-let fold_string ?strip ?sep ?header ~builder ~init ~f csv_string =
-  let header_map, csv_string =
+let fold_string ?strip ?sep ?header ?on_invalid_row builder ~init ~f csv_string =
+  match
     match Header_parse.create ?strip ?sep ?header builder with
-    | Second header_map -> (header_map, csv_string)
+    | Second header_map ->
+      Some (header_map, csv_string)
     | First header_parse ->
       match Header_parse.input header_parse ~len:(String.length csv_string) csv_string with
       | First _ ->
-        raise_s [%message "String ended mid-header row"
-                            (csv_string : string)
-                            (sep : char option)
-                            (header : Header.t option)]
-      | Second (header_map, csv_string) -> (header_map, csv_string)
-  in
-  let row_to_'a, fields_used = Builder.build ~header_map builder in
-  let f init row = f init (row_to_'a row) in
-  let state = Parse_state.create ?strip ?sep ~fields_used ~init ~f:(const f) () in
-  Parse_state.input state csv_string
-  |> Parse_state.finish
-  |> Parse_state.acc
+        if String.is_empty csv_string
+        then None
+        else raise_s [%message "String ended mid-header row"
+                                 (csv_string : string)
+                                 (sep : char option)
+                                 (header : Header.t option)]
+      | Second (header_map, csv_string) ->
+        Some (header_map, csv_string)
+  with
+  | None ->
+    init
+  | Some (header_map, csv_string) ->
+    Parse_state.input
+      (create_parse_state ?strip ?sep ?on_invalid_row header_map builder ~init ~f)
+      csv_string
+    |> Parse_state.finish
+    |> Parse_state.acc
 ;;
+
+include Builder
 
 module Replace_delimited_csv = struct
 
@@ -921,8 +958,7 @@ module Replace_delimited_csv = struct
       ;;
 
       let of_reader ?strip ?skip_lines ?sep ~header reader =
-        fold_reader_to_pipe ?strip ?skip_lines ?sep ~header
-          ~builder:Row.builder reader
+        fold_reader_to_pipe ?strip ?skip_lines ?sep ~header Row.builder reader
       ;;
 
       let create_reader ?strip ?skip_lines ?sep ~header filename =
@@ -931,8 +967,9 @@ module Replace_delimited_csv = struct
       ;;
 
       let parse_string ?strip ?sep ~header csv_string =
-        fold_string ?strip ?sep ~header csv_string
-          ~builder:Row.builder
+        fold_string ?strip ?sep ~header
+          Row.builder
+          csv_string
           ~init:(Fast_queue.create ())
           ~f:(fun queue row -> Fast_queue.enqueue queue row; queue)
         |> Fast_queue.to_list
@@ -978,127 +1015,3 @@ module Replace_delimited_csv = struct
     ;;
   end
 end
-
-let%bench_module "Fast_queue" =
-  (module struct
-    (* 2016-07-22: Our [enqueue] without resizing ("enqueue+clear" - "clear") takes about
-       1/3 as much time as [Core_queue], and other operations are comparable or better.
-
-        | Name                     | Time/Run | mWd/Run |
-        |--------------------------+----------+---------|
-        | Fast_queue.enqueue+clear | 4.69ns   |         |
-        | Core_queue.enqueue+clear | 8.56ns   |         |
-        | Fast_queue.clear         | 2.54ns   |         |
-        | Core_queue.clear         | 2.76ns   |         |
-        | Fast_queue.nth_exn       | 3.44ns   |         |
-        | Core_queue.nth_exn       | 4.77ns   |         |
-        | Fast_queue.to_array:100  | 611.61ns | 105.00w |
-        | Core_queue.to_array:100  | 611.79ns | 105.00w |
-
-       Weirdly, if [enqueue] needs to resize, it takes twice as long as [Core_queue],
-       despite doing strictly less work, and that work by an almost-verbatim copy of the
-       [Core_queue] code. Flamegraphs look the same too.
-
-        | Name               | Time/Run | mWd/Run | mjWd/Run |
-        |--------------------+----------+---------+----------|
-        | Fast_queue.enqueue | 161.90ns |         | 5.58w    |
-        | Core_queue.enqueue | 99.81ns  |         | 5.55w    |
-
-       Fortunately, our workload only requires a few resizes in the first row, and usually
-       no more for the rest of the file. *)
-    module M : module type of struct include Fast_queue end = struct
-      type 'a t = 'a Fast_queue.t
-
-      let create = Fast_queue.create
-
-      let%bench_fun "Fast_queue.create" [@indexed n = [ 10; 100; 1000; ] ] =
-fun () -> Fast_queue.create ~capacity:n ()
-
-let%bench_fun "Core_queue.create" [@indexed n = [ 10; 100; 1000; ] ] =
-fun () -> Queue.create ~capacity:n ()
-
-let of_list = Fast_queue.of_list
-
-let%bench_fun "Fast_queue.of_list" [@indexed n = [ 10; 100; 1000; ] ] =
-let l = List.init n ~f:Fn.id in
-fun () -> Fast_queue.of_list l
-
-let%bench_fun "Core_queue.of_list" [@indexed n = [ 10; 100; 1000; ] ] =
-let l = List.init n ~f:Fn.id in
-fun () -> Queue.of_list l
-
-let enqueue = Fast_queue.enqueue
-
-let%bench_fun "Fast_queue.enqueue" =
-  let t = Fast_queue.create () in
-  fun () -> Fast_queue.enqueue t ()
-
-let%bench_fun "Core_queue.enqueue" =
-  let t = Queue.create () in
-  fun () -> Queue.enqueue t ()
-
-let%bench_fun "Fast_queue.enqueue+clear" =
-  let t = Fast_queue.create () in
-  fun () ->
-    Fast_queue.enqueue t ();
-    Fast_queue.clear t
-
-let%bench_fun "Core_queue.enqueue+clear" =
-  let t = Queue.create () in
-  fun () ->
-    Queue.enqueue t ();
-    Queue.clear t
-
-let nth_exn = Fast_queue.nth_exn
-
-let%bench_fun "Fast_queue.nth_exn" =
-  let t = Fast_queue.of_list [ () ] in
-  fun () -> Fast_queue.nth_exn t 0
-
-let%bench_fun "Core_queue.nth_exn" =
-  let t = Queue.of_list [ () ] in
-  fun () -> Queue.get t 0
-
-let clear = Fast_queue.clear
-
-let%bench_fun "Fast_queue.clear" =
-  let t = Fast_queue.create () in
-  fun () -> Fast_queue.clear t
-
-let%bench_fun "Core_queue.clear" =
-  let t = Queue.create () in
-  fun () -> Queue.clear t
-
-let to_list = Fast_queue.to_list
-
-let%bench_fun "Fast_queue.to_list" [@indexed n = [ 10; 100; 1000; ] ] =
-let t = Fast_queue.of_list (List.init n ~f:Fn.id) in
-fun () -> Fast_queue.to_list t
-
-let%bench_fun "Core_queue.to_list" [@indexed n = [ 10; 100; 1000; ] ] =
-let t = Queue.of_list (List.init n ~f:Fn.id) in
-fun () -> Queue.to_list t
-
-let to_array = Fast_queue.to_array
-
-let%bench_fun "Fast_queue.to_array" [@indexed n = [ 10; 100; 1000; ] ] =
-let t = Fast_queue.of_list (List.init n ~f:Fn.id) in
-fun () -> Fast_queue.to_array t
-
-let%bench_fun "Core_queue.to_array" [@indexed n = [ 10; 100; 1000; ] ] =
-let t = Queue.of_list (List.init n ~f:Fn.id) in
-fun () -> Queue.to_array t
-
-let length = Fast_queue.length
-
-let%bench_fun "Fast_queue.length" =
-  let t = Fast_queue.create () in
-  fun () -> Fast_queue.length t
-
-let%bench_fun "Core_queue.length" =
-  let t = Queue.create () in
-  fun () -> Queue.length t
-
-
-end
-end)

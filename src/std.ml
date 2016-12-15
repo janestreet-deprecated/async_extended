@@ -26,6 +26,7 @@ module Log = struct
 end
 module Ltl                    = Ltl
 module Mailbox                = Mailbox
+module Pipe_iterator          = Pipe_iterator
 module Pipe_zipper            = Pipe_zipper
 module Priority_queue         = Priority_queue
 module Process                = Process
@@ -33,7 +34,6 @@ module Reader = struct
   include Async.Std.Reader
   include Reader_ext
 end
-module Safe_pipe              = Safe_pipe
 module Semaphore              = Semaphore
 module Shell                  = Async_shell
 module Shutdown               = Shutdown

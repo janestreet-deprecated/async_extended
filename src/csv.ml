@@ -558,6 +558,8 @@ module Builder = struct
       List.fold_right ts ~init:(return []) ~f:(map2 ~f:(fun x xs -> x :: xs))
     ;;
 
+    let all_ignore ts = map ~f:ignore (all ts)
+
     let both x y = Both (x, y)
 
     let ( <*> ) = apply
@@ -720,12 +722,12 @@ end = struct
   let limit_header builder limit_headers' csv_headers' =
     let limit_headers = String.Set.of_list limit_headers' in
     let builder_headers = Builder.headers_used builder in
-    if not (Set.subset builder_headers limit_headers)
+    if not (Set.is_subset builder_headers ~of_:limit_headers)
     then raise_s [%message "Builder uses header not specified in `Limit"
                              (builder_headers : String.Set.t)
                              (limit_headers : String.Set.t)];
     let csv_headers = String.Set.of_array csv_headers' in
-    if not (Set.subset limit_headers csv_headers)
+    if not (Set.is_subset limit_headers ~of_:csv_headers)
     then raise_s [%message "Header specified in `Limit not present in csv document"
                              (limit_headers : String.Set.t)
                              (csv_headers : String.Set.t)];

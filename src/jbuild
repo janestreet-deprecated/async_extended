@@ -7,7 +7,6 @@
     async_inotify
     async_interactive
     async_shell
-    camlzip
     command_rpc
     core
     core_extended

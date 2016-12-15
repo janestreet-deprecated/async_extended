@@ -16,18 +16,20 @@ end
 module State = struct
   type t =
     { kind : Kind.t
-    ; time : Time.t
+    ; time : Time_ns.t
     ; tag : int
     } [@@deriving sexp, fields]
 
   let to_string t =
     Sexp.to_string (sexp_of_t t)
 
+  let time t = Some (time t)
+
   let request ~tag ~time =
-    { kind = `Request; tag; time = Time.of_float (Float.of_int time) }
+    { kind = `Request; tag; time = Time.of_float (Float.of_int time) |> Time_ns.of_time }
 
   let response ~tag ~time =
-    { kind = `Response; tag; time = Time.of_float (Float.of_int time) }
+    { kind = `Response; tag; time = Time.of_float (Float.of_int time) |> Time_ns.of_time }
 end
 
 include Ltl.Make (State)
@@ -115,7 +117,10 @@ let check2 () =
   Which requests are not followed by a response within 5 seconds?
 ------------------------------------------------------------------*)
 
-let time = Variable.create "time" ~sexp_of:Time.sexp_of_t
+let time = Variable.create "time" ~sexp_of:Time_ns.sexp_of_t
+
+let sec x =
+  sec x |> Time_ns.Span.of_span
 
 let liveness3 =
   always ((request

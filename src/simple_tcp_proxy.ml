@@ -79,6 +79,8 @@ let create ~proxy_listen_port ~server_listen_port =
   t
 ;;
 
+let proxy_listen_port t = Tcp.Server.listening_on t.proxy_server
+
 let stop_client_to_server t = t.ok_client_to_server <- Ivar.create ()
 let stop_server_to_client t = t.ok_server_to_client <- Ivar.create ()
 

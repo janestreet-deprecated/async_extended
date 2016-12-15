@@ -90,7 +90,7 @@ let _ = compare
 module type State = sig
   type t
   val to_string : t -> string
-  val time : t -> Time.t
+  val time : t -> Time_ns.t option
 end
 
 module Make (State: State) = struct
@@ -123,9 +123,9 @@ module Make (State: State) = struct
       t.hashable.compare
 
     let time =
-      { id = Type_equal.Id.create ~name:"time" Time.sexp_of_t
-      ; get = (fun state -> Some (State.time state))
-      ; hashable = Time.hashable
+      { id = Type_equal.Id.create ~name:"time" Time_ns.sexp_of_t
+      ; get = (fun state -> State.time state)
+      ; hashable = Time_ns.hashable
       }
   end
 
@@ -451,28 +451,34 @@ module Make (State: State) = struct
     predicate ?description Expression.(map ~f (field fld))
 
   let before before_time =
-    field_predicate
-      ~description:(sprintf !"before %{sexp:Time.t}" before_time)
-      Field.time
-      (fun time_field -> Time.(time_field <= before_time))
+    predicate
+      ~description:(sprintf !"before %{sexp:Time_ns.t}" before_time)
+      Expression.(
+        map
+          (maybe_field Field.time)
+          ~f:(Option.value_map ~default:false ~f:(Time_ns.(>) before_time))
+      )
 
   let after after_time =
-    field_predicate
-      ~description:(sprintf !"after %{sexp:Time.t}" after_time)
-      Field.time
-      (fun time_field -> Time.(time_field >= after_time))
+    predicate
+      ~description:(sprintf !"after %{sexp:Time_ns.t}" after_time)
+      Expression.(
+        map
+          (maybe_field Field.time)
+          ~f:(Option.value_map ~default:false ~f:(Time_ns.(<) after_time))
+      )
 
-  let before_var ?(add = Time.Span.zero) vtime =
+  let before_var ?(add = Time_ns.Span.zero) vtime =
     predicate Expression.(
       map2 (variable vtime) (field Field.time)
         ~f:(fun var_time field_time ->
-          field_time <= Time.add var_time add))
+          field_time <= Time_ns.add var_time add))
 
-  let after_var ?(add = Time.Span.zero) vtime =
+  let after_var ?(add = Time_ns.Span.zero) vtime =
     predicate Expression.(
       map2 (variable vtime) (field Field.time)
         ~f:(fun var_time field_time ->
-          field_time >= Time.add var_time add))
+          field_time >= Time_ns.add var_time add))
 
   let rec true_at_eof t =
     let fail_empty () =
@@ -962,7 +968,7 @@ module Make (State: State) = struct
   let validate t =
     Or_error.map (Normalize.normalize t) ~f:ignore
 
-  let query ?debug ?(allow_nonmonotonic_times = false) t input_pipe =
+  let query ?debug ?(allow_nonmonotonic_times = false) ?(allow_missing_times = false) t input_pipe =
     let count = ref 0 in
     let last_time = ref None in
     let step constraints = function
@@ -973,21 +979,23 @@ module Make (State: State) = struct
       | `Ok state ->
         incr count;
         let time = State.time state in
-        Option.iter !last_time ~f:(fun last_time ->
-          if Time.(<) time last_time
+        if not allow_missing_times && Option.is_none time then
+          failwithf "Missing time for state: %s \n " (State.to_string state) ();
+        Option.iter (Option.both !last_time time) ~f:(fun (last_time, time) ->
+          if Time_ns.(<) time last_time
           then begin
             let error =
-              sprintf !"Time %{sexp:Time.t} in %s is smaller than previous time"
+              sprintf !"Time_ns %{sexp:Time_ns.t} in %s is smaller than previous time"
                 time (State.to_string state)
             in
             Option.iter debug ~f:(fun debug -> Log.error debug "%s" error);
             if not allow_nonmonotonic_times then failwith error
           end);
-        last_time := Some (State.time state);
+        last_time := State.time state;
         let results, constraints = Constraints.step constraints state in
         Option.iter debug ~f:(fun debug ->
           Log.info debug
-            !"state %d (%{sexp:Time.t}), \
+            !"state %d (%{sexp:Time_ns.t option}), \
               active constraints: %d, \
               sleeping guards: %d"
             !count
@@ -1035,8 +1043,8 @@ module Make (State: State) = struct
       Log.info debug !"normalized formula:\n%{sexp:t}" t);
     Ok (output t)
 
-  let eval ?debug ?allow_nonmonotonic_times t input =
-    Or_error.map (query ?debug ?allow_nonmonotonic_times t input)
+  let eval ?debug ?allow_nonmonotonic_times ?allow_missing_times t input =
+    Or_error.map (query ?debug ?allow_nonmonotonic_times ?allow_missing_times t input)
       ~f:(fun output ->
         Pipe.read output
         >>| fun res ->
@@ -1047,10 +1055,16 @@ module Make (State: State) = struct
 end
 
 let%test_module _ = (module struct
+  let test_eval' eval t states ~expect =
+    Thread_safe.block_on_async_exn (fun () ->
+      Or_error.ok_exn (eval t (Pipe.of_list states))
+      >>| fun result ->
+      [%test_result: bool] result ~expect)
+
   module State = struct
-    type t = Time.t * int option [@@deriving sexp, compare]
+    type t = Time_ns.t * int option [@@deriving sexp, compare]
     let to_string t = Sexp.to_string (sexp_of_t t)
-    let time (time, _) = time
+    let time (time, _) = Some time
   end
 
   module P = Make (State)
@@ -1198,7 +1212,7 @@ let%test_module _ = (module struct
   (* (1 | ... | 5){1, 5}. *)
   let all_permutations =
     let rec generate n acc xss =
-      let time = Time.of_float (Float.of_int n) in
+      let time = Time.of_float (Float.of_int n) |> Time_ns.of_time in
       match xss with
       | [] -> [List.rev acc]
       | xs :: xss ->
@@ -1221,11 +1235,7 @@ let%test_module _ = (module struct
     in
     test_one ?skip_naive t xs ~expect
 
-  let test_eval t states ~expect =
-    Thread_safe.block_on_async_exn (fun () ->
-      Or_error.ok_exn (P.eval t (Pipe.of_list states))
-      >>| fun result ->
-      [%test_result: bool] result ~expect)
+  let test_eval = test_eval' P.eval
 
   let test ?(skip_naive = false) t data ~expect =
     Thread_safe.block_on_async_exn (fun () ->
@@ -1246,7 +1256,7 @@ let%test_module _ = (module struct
   open P.O
 
   let add_times values =
-    let times n = List.init n ~f:(fun i -> Time.of_float (Float.of_int i)) in
+    let times n = List.init n ~f:(fun i -> Time.of_float (Float.of_int i) |> Time_ns.of_time) in
     List.zip_exn (times (List.length values)) values
 
   let states =
@@ -1312,6 +1322,9 @@ let%test_module _ = (module struct
 
   let gt var =
     predicate Expression.(map2 (variable var) (field value) ~f:(>))
+
+  let sec x =
+    sec x |> Time_ns.Span.of_span
 
   (* For tests involving an additional time variable we are going to skip naive
      evaluation. *)
@@ -1405,4 +1418,59 @@ let%test_module _ = (module struct
         (const false)
     in
     test property states ~expect:[]
+
+  module No_time_states = struct
+    type t = int [@@deriving sexp, compare]
+    let to_string t = Sexp.to_string (sexp_of_t t)
+    let time _ = None
+  end
+
+  module M = Make (No_time_states)
+
+  let states = [1; 2; 0; 10; 1; 15]
+
+  let test_eval = test_eval' (M.eval ~allow_missing_times:true)
+
+  let time_of_int x =
+    Time_ns.of_span_since_epoch (Time_ns.Span.of_int_sec x)
+
+  let%test_unit _ =
+    test_eval
+      (M.eventually (M.after (time_of_int 0)))
+      states
+      ~expect:false
+
+  let%test_unit _ =
+    test_eval
+      (M.eventually (M.before (time_of_int 100)))
+      states
+      ~expect:false
+
+  module States_with_times = struct
+    type t = (Time_ns.t * int) [@@deriving sexp, compare]
+    let to_string t = Sexp.to_string (sexp_of_t t)
+    let time (time, _) = Some time
+  end
+
+  module Q = Make (States_with_times)
+
+  let test_eval = test_eval' Q.eval
+
+  let states =
+    List.mapi
+      [1; 2; 0; 10; 1; 15]
+      ~f:(fun i element -> (time_of_int i, element))
+  ;;
+
+  let%test_unit _ =
+    test_eval
+      (Q.eventually (Q.after (time_of_int 3)))
+      states
+      ~expect:true
+
+  let%test_unit _ =
+    test_eval
+      (Q.eventually (Q.before (time_of_int 3)))
+      states
+      ~expect:true
 end)

@@ -38,7 +38,7 @@ open! Async.Std
 module type State = sig
   type t
   val to_string : t -> string
-  val time : t -> Time.t
+  val time : t -> Time_ns.t option
 end
 
 (* LTL checker over sequences of State.t *)
@@ -54,7 +54,7 @@ module Make (State : State) : sig
       -> 'a Hashtbl.Hashable.t
       -> 'a t
 
-    val time : Time.t t
+    val time : Time_ns.t t
   end
 
   module Variable : sig
@@ -179,19 +179,21 @@ module Make (State : State) : sig
     Derived constructors
   -----------------------*)
 
-  (** [before t] is true if the state has time less or equal to [t] *)
-  val before : Time.t -> t
+  (** [before t] is true if the state has time less or equal to [t]. [before t]
+      is false if the time is [None]. *)
+  val before : Time_ns.t -> t
 
-  (** [after t] is true if the state has time greater or equal to [t] *)
-  val after  : Time.t -> t
+  (** [after t] is true if the state has time greater or equal to [t]. [after t]
+      is false if the time is [None]. *)
+  val after  : Time_ns.t -> t
 
   (** [before_var ~add v] is true if the state has time less or equal to
       [v + add]. *)
-  val before_var : ?add : Time.Span.t -> Time.t Variable.t -> t
+  val before_var : ?add : Time_ns.Span.t -> Time_ns.t Variable.t -> t
 
   (** [after_var ~add v] is true if the state has time greater or equal to
       [v + add]. *)
-  val after_var  : ?add : Time.Span.t -> Time.t Variable.t -> t
+  val after_var  : ?add : Time_ns.Span.t -> Time_ns.t Variable.t -> t
 
   (** [field_predicate fld f] is a predicate that is true if the state contains
       [fld] and the value of [fld] satisfies [f]:
@@ -261,6 +263,7 @@ module Make (State : State) : sig
        not have the intuitive meaning you expect. Therefore you need to
        explicitly acknowledge if you want to deal with such sequences. *)
     -> ?allow_nonmonotonic_times : bool (* default = false *)
+    -> ?allow_missing_times : bool (* default = false *)
     -> t
     -> State.t Pipe.Reader.t
     -> bool Deferred.t Or_error.t
@@ -272,6 +275,7 @@ module Make (State : State) : sig
   val query
     :  ?debug : Log.t
     -> ?allow_nonmonotonic_times : bool (* default = false *)
+    -> ?allow_missing_times : bool (* default = false *)
     -> t
     -> State.t Pipe.Reader.t
     -> Assignment.t Pipe.Reader.t Or_error.t

@@ -35,7 +35,8 @@ let hack_to_avoid_incomplete_pipe pipe close_reason ~connection_to_client =
        close_reason
        >>= function
        | Rpc.Pipe_close_reason.Closed_locally ->
-         assert false
+         assert (Pipe.is_closed writer);
+         return ()
        | Closed_remotely ->
          Pipe.close writer; return ()
        | Error e ->

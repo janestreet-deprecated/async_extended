@@ -588,6 +588,7 @@ module Csv = struct
     in
     let pipe_r, pipe_w = Pipe.create () in
     don't_wait_for (Writer.transfer writer pipe_r (write_line ~sep ~line_break writer));
+    upon (Pipe.closed pipe_w) (fun () -> don't_wait_for (Writer.close writer));
     pipe_w
   ;;
 
@@ -717,6 +718,7 @@ module Positional = struct
     | Ok (header, _) ->
       let pipe_r, pipe_w = Pipe.create () in
       don't_wait_for (Pipe.iter_without_pushback pipe_r ~f:(write_line writer header 0));
+      upon (Pipe.closed pipe_w) (fun () -> don't_wait_for (Writer.close writer));
       Ok pipe_w
   ;;
 

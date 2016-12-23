@@ -10,7 +10,7 @@ end
 let updates ?(poll_interval=sec 5.) filename ~transform =
   let f =
     match transform with
-    | `Of_sexp f -> (fun s -> f (Sexp.of_string (String.strip s)))
+    | `Of_sexp f -> (fun s -> f (Sexp.of_string s))
     | `Of_raw f  -> f
   in
   let r,w = Pipe.create () in

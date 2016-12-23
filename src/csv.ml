@@ -267,6 +267,8 @@ module Parse_state = struct
   type 'a t =
     { acc              : 'a
     ; sep              : char
+    ; quote            : char
+    ; use_quoting      : bool
     ; lineno           : int
     ; step             : Step.t
     ; field            : string
@@ -288,14 +290,20 @@ module Parse_state = struct
   ;;
 
   let emit_row f i acc current_row =
-    let acc = f i acc current_row in
+    let acc = f (i + 1) acc current_row in
     Fast_queue.clear current_row;
     acc
   ;;
 
-  let create ?(strip=false) ?(sep=',') ~fields_used ~init ~f () =
+  let set_acc t acc =
+    { t with acc }
+  ;;
+
+  let create ?(strip=false) ?(sep=',') ?(quote=`Using '"') ~fields_used ~init ~f () =
     { acc = init
     ; sep
+    ; quote = (match quote with | `Using char -> char | `No_quoting -> '"')
+    ; use_quoting = (match quote with | `Using _ -> true | `No_quoting -> false)
     ; lineno = 1
     ; step = Field_start
     ; field = ""
@@ -374,7 +382,7 @@ module Parse_state = struct
         else
           match step with
           | Field_start ->
-            if c = '\"'
+            if c = t.quote && t.use_quoting
             then continue t In_quoted_field
             else if c = t.sep
             then begin
@@ -420,16 +428,17 @@ module Parse_state = struct
               end
             end
           | In_quoted_field ->
-            if c = '\"'
+            if c = t.quote
             then continue t In_quoted_field_after_quote
             else begin
               if !enqueue then Buffer.add_char field c;
               continue t step
             end
           | In_quoted_field_after_quote ->
-            if c = '\"'
+            (* We must be using quoting to be in this state. *)
+            if c = t.quote
             then begin (* doubled quote *)
-              if !enqueue then Buffer.add_char field '"';
+              if !enqueue then Buffer.add_char field t.quote;
               continue t In_quoted_field
             end
             else if c = '0'
@@ -692,6 +701,7 @@ module Header_parse : sig
   val create
     :  ?strip : bool
     -> ?sep : char
+    -> ?quote : [ `No_quoting | `Using of char ]
     -> ?header : Header.t
     -> _ Builder.t
     -> (t, int String.Map.t) Either.t
@@ -734,29 +744,29 @@ end = struct
     header_map csv_headers'
   ;;
 
-  let create' ?strip ?sep transform =
-    let f offset () row = raise (Header_parsed (Fast_queue.to_array row, offset + 1)) in
-    { state = Parse_state.create ?strip ?sep ~fields_used:None ~init:() ~f ()
+  let create' ?strip ?sep ?quote transform =
+    let f offset () row = raise (Header_parsed (Fast_queue.to_array row, offset)) in
+    { state = Parse_state.create ?strip ?sep ?quote ~fields_used:None ~init:() ~f ()
     ; transform
     }
   ;;
 
-  let create ?strip ?sep ?(header=`No) builder =
+  let create ?strip ?sep ?quote ?(header=`No) builder =
     match header with
     | `No              -> Second (String.Map.empty)
     | `Add headers     -> Second (header_map (Array.of_list headers))
     | `Yes             ->
       let f headers = limit_header builder (Array.to_list headers) headers in
-      First  (create' ?strip ?sep f)
+      First  (create' ?strip ?sep ?quote f)
     | `Limit headers   ->
       let f csv_headers = limit_header builder headers csv_headers in
-      First  (create' ?strip ?sep f)
+      First  (create' ?strip ?sep ?quote f)
     | `Replace headers ->
       let f _ = header_map (Array.of_list headers) in
-      First  (create' ?strip ?sep f)
+      First  (create' ?strip ?sep ?quote f)
     | `Transform f     ->
       let f headers = header_map (Array.of_list (f (Array.to_list headers))) in
-      First (create' ?strip ?sep f)
+      First (create' ?strip ?sep ?quote f)
   ;;
 
   let input t ~len input =
@@ -768,7 +778,7 @@ end = struct
 end
 
 let create_parse_state
-      ?strip ?sep ?(on_invalid_row=On_invalid_row.raise) header_map builder ~init ~f =
+      ?strip ?sep ?quote ?(on_invalid_row=On_invalid_row.raise) header_map builder ~init ~f =
   let (row_to_'a, fields_used) = Builder.build ~header_map builder in
   let f _offset init row =
     try f init (row_to_'a row) with exn ->
@@ -777,13 +787,13 @@ let create_parse_state
     | `Skip -> init
     | `Raise exn -> raise exn
   in
-  Parse_state.create ?strip ?sep ~fields_used ~init ~f ()
+  Parse_state.create ?strip ?sep ?quote ~fields_used ~init ~f ()
 ;;
 
-let fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init ~f r =
+let fold_reader' ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder ~init ~f r =
   let%bind () = drop_lines r ?skip_lines in
   match%bind
-    match Header_parse.create ?strip ?sep ?header builder with
+    match Header_parse.create ?strip ?sep ?quote ?header builder with
     | Second header_map ->
       return (Some (header_map, None))
     | First header_parse ->
@@ -808,7 +818,7 @@ let fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init ~
     let state =
       create_parse_state
         ?strip
-        ?sep
+        ?sep ?quote
         ?on_invalid_row
         header_map
         builder
@@ -839,21 +849,21 @@ let bind_without_unnecessary_yielding x ~f =
   | None -> Deferred.bind x ~f
 ;;
 
-let fold_reader ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init ~f r =
-  fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init r ~f:(fun acc queue ->
+let fold_reader ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder ~init ~f r =
+  fold_reader' ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder ~init r ~f:(fun acc queue ->
     Queue.fold queue ~init:(return acc) ~f:(fun deferred_acc row ->
       bind_without_unnecessary_yielding deferred_acc ~f:(fun acc -> f acc row)))
 ;;
 
-let fold_reader_without_pushback ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init ~f r =
-  fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init r ~f:(fun acc queue ->
+let fold_reader_without_pushback ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder ~init ~f r =
+  fold_reader' ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder ~init r ~f:(fun acc queue ->
     return (Queue.fold queue ~init:acc ~f))
 ;;
 
-let fold_reader_to_pipe ?strip ?skip_lines ?sep ?header ?on_invalid_row builder reader =
+let fold_reader_to_pipe ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder reader =
   let r,w = Pipe.create () in
   let write_to_pipe : unit Deferred.t =
-    fold_reader' ?strip ?skip_lines ?sep ?header ?on_invalid_row builder ~init:() reader
+    fold_reader' ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder ~init:() reader
       ~f:(fun () queue -> Pipe.transfer_in w ~from:queue)
     >>= fun () ->
     return (Pipe.close w)
@@ -862,9 +872,9 @@ let fold_reader_to_pipe ?strip ?skip_lines ?sep ?header ?on_invalid_row builder 
   r
 ;;
 
-let fold_string ?strip ?sep ?header ?on_invalid_row builder ~init ~f csv_string =
+let fold_string ?strip ?sep ?quote ?header ?on_invalid_row builder ~init ~f csv_string =
   match
-    match Header_parse.create ?strip ?sep ?header builder with
+    match Header_parse.create ?strip ?sep ?quote ?header builder with
     | Second header_map ->
       Some (header_map, csv_string)
     | First header_parse ->
@@ -883,7 +893,7 @@ let fold_string ?strip ?sep ?header ?on_invalid_row builder ~init ~f csv_string 
     init
   | Some (header_map, csv_string) ->
     Parse_state.input
-      (create_parse_state ?strip ?sep ?on_invalid_row header_map builder ~init ~f)
+      (create_parse_state ?strip ?sep ?quote ?on_invalid_row header_map builder ~init ~f)
       csv_string
     |> Parse_state.finish
     |> Parse_state.acc
@@ -918,8 +928,8 @@ module Replace_delimited_csv = struct
         Second parse_state, result
       ;;
 
-      let create_parse_state ?strip ?sep header_map =
-        Parse_state.create ?strip ?sep
+      let create_parse_state ?strip ?sep ?quote header_map =
+        Parse_state.create ?strip ?sep ?quote
           ~fields_used:None
           ~init:(Fast_queue.create ())
           ~f:(fun _ queue row ->
@@ -928,7 +938,7 @@ module Replace_delimited_csv = struct
           ()
       ;;
 
-      let manual_parse_header ?strip ?sep header_state input =
+      let manual_parse_header ?strip ?sep ?quote header_state input =
         let input =
           match input with
           | `Eof -> ""
@@ -937,7 +947,7 @@ module Replace_delimited_csv = struct
         match Header_parse.input header_state ~len:(String.length input) input with
         | First header_state -> First header_state, []
         | Second (header_map, input) ->
-          let state = create_parse_state ?strip ?sep header_map in
+          let state = create_parse_state ?strip ?sep ?quote header_map in
           manual_parse_data state (`Data input)
       ;;
 

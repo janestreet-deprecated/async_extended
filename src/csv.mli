@@ -35,7 +35,7 @@ val at_header : string -> f:(string -> 'a) -> 'a t
 *)
 type 'a on_invalid_row
 
-(** [of_reader ?strip ?skip_lines ?sep ~init ~f r] produces a value by folding
+(** [of_reader ?strip ?skip_lines ?sep ?quote ~init ~f r] produces a value by folding
     over a csv document read from [r].
 
     If [strip] is true, leading and trailing whitespace is stripped from each field.
@@ -49,11 +49,17 @@ type 'a on_invalid_row
 
     [sep] is the character that separates fields within a row.
     Default value is ','
-*)
+
+    [quote] defines a character to use for quoting. The default is [ `Using '"' ] which
+    implements the MS Excel convention: either a field is unquoted, or it has leading and
+    trailing quotes and internal escaped characters are represented as quote-char char,
+    e.g., {|"a|} for [a].  [ `No_quoting ] means all characters are literal.
+ *)
 val fold_reader :
   ?strip:bool
   -> ?skip_lines:int
   -> ?sep:char
+  -> ?quote:[ `No_quoting | `Using of char]
   -> ?header:Header.t
   -> ?on_invalid_row:'a on_invalid_row
   -> 'a t
@@ -62,7 +68,7 @@ val fold_reader :
   -> Reader.t
   -> 'b Deferred.t
 
-(** [of_reader' ?strip ?skip_lines ?sep ~init ~f r] works similarly to
+(** [of_reader' ?strip ?skip_lines ?sep ?quote ~init ~f r] works similarly to
     [of_reader], except for the [f] argument. [of_reader'] runs [f] on batches
     of [Row.t]s rather than running [f] on each individual row.
 *)
@@ -70,6 +76,7 @@ val fold_reader' :
   ?strip:bool
   -> ?skip_lines:int
   -> ?sep:char
+  -> ?quote:[ `No_quoting | `Using of char]
   -> ?header:Header.t
   -> ?on_invalid_row:'a on_invalid_row
   -> 'a t
@@ -82,6 +89,7 @@ val fold_reader_without_pushback :
   ?strip:bool
   -> ?skip_lines:int
   -> ?sep:char
+  -> ?quote:[ `No_quoting | `Using of char]
   -> ?header:Header.t
   -> ?on_invalid_row:'a on_invalid_row
   -> 'a t
@@ -94,6 +102,7 @@ val fold_reader_to_pipe :
   ?strip:bool
   -> ?skip_lines:int
   -> ?sep:char
+  -> ?quote:[ `No_quoting | `Using of char]
   -> ?header:Header.t
   -> ?on_invalid_row:'a on_invalid_row
   -> 'a t
@@ -103,6 +112,7 @@ val fold_reader_to_pipe :
 val fold_string :
   ?strip:bool
   -> ?sep:char
+  -> ?quote:[ `No_quoting | `Using of char]
   -> ?header:Header.t
   -> ?on_invalid_row:'a on_invalid_row
   -> 'a t
@@ -151,9 +161,13 @@ module Parse_state : sig
   (** At any moment, the result of folding over all complete rows seen so far. *)
   val acc : 'a t -> 'a
 
+  (** Can be used to set or clear the current [acc] *)
+  val set_acc : 'a t -> 'a -> 'a t
+
   val create
     :  ?strip : bool
     -> ?sep : char
+    -> ?quote:[ `No_quoting | `Using of char]
     (** Indices of the fields used. E.g., [~fields_used:(Some [| 0; 3; |])] means every
         row will be presented to [f] as having two fields, the first and fourth fields of
         the csv. This is for performance; pass [None] to store all fields.*)

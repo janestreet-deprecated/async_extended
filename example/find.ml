@@ -1,33 +1,19 @@
-open Core.Std;;
-open Async.Std;;
-module Find = Async_extended.Std.Find;;
-module Stats = Unix.Stats
-module FO = Find.Options
+open! Core.Std
+open Async.Std
+module Find = Async_extended.Std.Find
 
-
-let file_list ~inc ~exc path =
-  let filter = Some (fun (fn,stat) ->
-      let file = stat.Stats.kind = `File in
-      let included = Pcre.pmatch ~pat:inc fn in
-      let excluded = match exc with None -> false | Some pat -> Pcre.pmatch ~pat fn in
-      return (file && (included && not excluded))
-    )
-  in
-  let options = {FO.default with FO.filter = filter} in
-  Find.to_list (Find.create ~options path)
+let main path =
+  let options = Find.Options.default in
+  Find.iter (Find.create ~options path)
+    ~f:(fun (file, _) -> printf "%s\n" file; return ())
 ;;
 
 let () =
   Command.async' ~summary:"simple find like tool"
     (let open Command.Let_syntax in
      let%map_open
-       path    = anon ("PATH"    %: file) and
-       pattern = anon ("PATTERN" %: string)
+       path = anon ("PATH" %: file)
      in
-     fun () ->
-       file_list ~inc:pattern ~exc:None path
-       >>= fun file_list ->
-       List.iter file_list ~f:(fun (file, _) -> Print.printf "%s\n%!" file);
-       Deferred.unit)
+     fun () -> main path)
   |> Command.run
 ;;

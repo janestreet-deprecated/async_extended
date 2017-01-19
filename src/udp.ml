@@ -40,12 +40,12 @@ end = struct
         failwithf "recvfrom on bad file descriptor %s" (Unix.Fd.to_string fd) ()
     | `Ready ->
         let i, addr =
-          Core.Core_unix.recvfrom (Unix.Fd.file_descr_exn fd) ~buf ~pos ~len ~mode:[]
+          Core.Unix.recvfrom (Unix.Fd.file_descr_exn fd) ~buf ~pos ~len ~mode:[]
         in
         let addr =
           (* this should only ever be called on inet sockets *)
           match addr with
-          | Core.Core_unix.ADDR_INET (a, i) -> `Inet (a, i)
+          | Core.Unix.ADDR_INET (a, i) -> `Inet (a, i)
           | _ -> assert false
         in
         (i, addr)

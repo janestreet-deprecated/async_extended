@@ -1212,7 +1212,10 @@ let%test_module _ = (module struct
   (* (1 | ... | 5){1, 5}. *)
   let all_permutations =
     let rec generate n acc xss =
-      let time = Time.of_float (Float.of_int n) |> Time_ns.of_time in
+      let time =
+        Time.of_span_since_epoch (Time.Span.of_sec (Float.of_int n))
+        |> Time_ns.of_time
+      in
       match xss with
       | [] -> [List.rev acc]
       | xs :: xss ->
@@ -1256,7 +1259,10 @@ let%test_module _ = (module struct
   open P.O
 
   let add_times values =
-    let times n = List.init n ~f:(fun i -> Time.of_float (Float.of_int i) |> Time_ns.of_time) in
+    let times n = List.init n ~f:(fun i ->
+      Time.of_span_since_epoch (Time.Span.of_sec (Float.of_int i))
+      |> Time_ns.of_time)
+    in
     List.zip_exn (times (List.length values)) values
 
   let states =

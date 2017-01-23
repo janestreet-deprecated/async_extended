@@ -26,10 +26,10 @@ module State = struct
   let time t = Some (time t)
 
   let request ~tag ~time =
-    { kind = `Request; tag; time = Time.of_float (Float.of_int time) |> Time_ns.of_time }
+    { kind = `Request; tag; time = Time.of_span_since_epoch (Time.Span.of_sec (Float.of_int time)) |> Time_ns.of_time }
 
   let response ~tag ~time =
-    { kind = `Response; tag; time = Time.of_float (Float.of_int time) |> Time_ns.of_time }
+    { kind = `Response; tag; time = Time.of_span_since_epoch (Time.Span.of_sec (Float.of_int time)) |> Time_ns.of_time }
 end
 
 include Ltl.Make (State)

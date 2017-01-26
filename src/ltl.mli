@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 (** Using linear temporal logic (LTL) to run online queries on sequences of

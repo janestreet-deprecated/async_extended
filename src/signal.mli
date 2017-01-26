@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 (* A Signal is a broadcast communication mechanism useful for event-based and

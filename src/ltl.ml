@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 
 (* The algorithm idea is as follows. Define

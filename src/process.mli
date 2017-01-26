@@ -1,6 +1,6 @@
 (** This module is deprecated; please use [Async.Std.Process]. *)
 
-open! Core.Std
+open! Core
 open! Async.Std
 
 module Output : sig
@@ -23,9 +23,9 @@ val create
   -> ?stdin:string
   -> f:(Pid.t -> stdin:Writer.t -> stdout:Reader.t -> stderr:Reader.t -> 'a Deferred.t)
   -> unit
-  -> ('a * Core.Std.Unix.Exit_or_signal.t) Deferred.t
+  -> ('a * Core.Unix.Exit_or_signal.t) Deferred.t
 
-type file_descr = Core.Std.Unix.File_descr.t
+type file_descr = Core.Unix.File_descr.t
 
 (** [create_fds...] like create, except that the three file_descrs to be used for the
     stdin/stdout/stderr of the forked process are passed in. The passed-in file_descrs
@@ -62,9 +62,9 @@ val create_fds'
 
 (** [open_in ~prog ~args] runs prog with args and returns a readers connected to stdout
     and stderr.  When both of those readers are closed then the process is reaped (and
-    killed if necessary).  is_ok defaults to Core.Std.Unix.Exit_or_signal.ok. *)
+    killed if necessary).  is_ok defaults to Core.Unix.Exit_or_signal.ok. *)
 val open_in
-  :  ?is_ok:(Core.Std.Unix.Exit_or_signal.t -> bool)
+  :  ?is_ok:(Core.Unix.Exit_or_signal.t -> bool)
   -> ?kill:unit Deferred.t
   -> prog:string
   -> args:string list

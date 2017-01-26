@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 
 module Throttle_and_count : sig

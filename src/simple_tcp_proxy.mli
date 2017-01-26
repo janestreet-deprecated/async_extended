@@ -1,7 +1,7 @@
 (** This is a simple tcp proxy that might be useful for simulating connection problems
     between clients and servers. *)
 
-open! Core.Std
+open! Core
 open! Async.Std
 
 type t

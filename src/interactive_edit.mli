@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 val edit_file : ?success_message:string

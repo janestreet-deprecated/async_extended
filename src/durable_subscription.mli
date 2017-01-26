@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 (* This module is designed to help processess maintain update subscriptions that will

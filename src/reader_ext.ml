@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 module Process_in_this_dir = Process
 open Async.Std
 module Process = Process_in_this_dir

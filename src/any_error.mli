@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 (** A variant of [Deferred.Result.t] with "any error" semantics. When multiple deferred

@@ -22,7 +22,7 @@
    We say that activation [a] is enclosed into activation [b] whenever
    [a] begins before [b] and [a] ends after [b]
 *)
-open! Core.Std
+open! Core
 open! Async_kernel.Std
 
 module Raw : sig
@@ -130,7 +130,7 @@ val shared : ('a, 'e) t -> ('a, 'e) t
 
 module Memo (Key : Hashable) : sig
   (**
-     [memo f] is similar to [Core.Std.Memo.general (fun k -> shared (f k))].  The
+     [memo f] is similar to [Core.Memo.general (fun k -> shared (f k))].  The
      important difference is that the memo entry is only kept while the resource is
      acquired. In particular, once all handles of a particular key get released the memo
      entry gets forgotten and [f] gets applied again on next acquisition.  If [acquire]

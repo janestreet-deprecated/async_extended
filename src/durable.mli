@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 (** Durable is designed to help recover from simple errors when using mutable data types

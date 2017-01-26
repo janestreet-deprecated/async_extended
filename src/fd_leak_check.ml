@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 
 module F = Core_extended.Std.Fd_leak_check

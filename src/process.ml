@@ -1,10 +1,10 @@
-open Core.Std
+open Core
 open Async.Std
 
 module Exit_or_signal_or_stop = Unix.Exit_or_signal_or_stop
 module Fd = Unix.Fd
 module Async_unix = Unix
-module Unix = Core.Std.Unix
+module Unix = Core.Unix
 
 module Output = struct
   type 'a t = {
@@ -129,7 +129,7 @@ let create_fds'
         never_returns (Unix.exec ?env ~prog ~args:(prog :: args) ());
       with
       | _ ->
-        Core.Std.Printf.eprintf "exec failed: %s\n%!" prog;
+        Core.Printf.eprintf "exec failed: %s\n%!" prog;
         Unix.exit_immediately 1
     end
   | `In_the_parent pid ->

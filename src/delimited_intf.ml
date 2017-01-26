@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 (** All readers defined below will raise if they encounter unparsable content. *)

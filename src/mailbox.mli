@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 (** Erlang style mailboxes built on top of async streams *)

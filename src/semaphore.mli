@@ -1,6 +1,6 @@
 (** The standard semaphore concept, with an async API. *)
 
-open! Core.Std
+open! Core
 open! Async.Std
 
 type t [@@deriving sexp_of]

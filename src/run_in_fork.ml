@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 
 type 'a ret =
@@ -23,12 +23,12 @@ let in_the_child ~f bin_writer_t writer error_writer =
   let bin_writer_t = bin_writer_ret bin_writer_t in
   let shutdown code =
     do_write writer bin_writer_t bigstring Done;
-    Core.Std.Unix.close writer;
-    if not (Core.Std.Unix.File_descr.equal writer error_writer) then begin
+    Core.Unix.close writer;
+    if not (Core.Unix.File_descr.equal writer error_writer) then begin
       do_write error_writer bin_writer_t bigstring Done;
-      Core.Std.Unix.close error_writer;
+      Core.Unix.close error_writer;
     end;
-    Core.Std.Unix.exit_immediately code
+    Core.Unix.exit_immediately code
   in
   try
     f ~write:(fun res -> do_write writer bin_writer_t bigstring (Part res));
@@ -90,16 +90,16 @@ module Multiple = struct
   ;;
 
   let run_in_fork ?max_len ~bin_t ~f () =
-    let (reader, writer)             = Core.Std.Unix.pipe () in
-    let (error_reader, error_writer) = Core.Std.Unix.pipe () in
-    match Core.Std.Unix.fork () with
+    let (reader, writer)             = Core.Unix.pipe () in
+    let (error_reader, error_writer) = Core.Unix.pipe () in
+    match Core.Unix.fork () with
     | `In_the_child ->
-      Core.Std.Unix.close reader;
-      Core.Std.Unix.close error_reader;
+      Core.Unix.close reader;
+      Core.Unix.close error_reader;
       in_the_child ~f bin_t.Bin_prot.Type_class.writer writer writer
     | `In_the_parent _pid ->
-      Core.Std.Unix.close writer;
-      Core.Std.Unix.close error_writer;
+      Core.Unix.close writer;
+      Core.Unix.close error_writer;
       in_the_parent ?max_len bin_t.Bin_prot.Type_class.reader reader error_reader
   ;;
 end

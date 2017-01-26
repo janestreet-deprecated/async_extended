@@ -1,4 +1,4 @@
-open! Core.Std
+open! Core
 open! Async.Std
 
 val input_sexps : Reader.t -> Sexp.t list Deferred.t

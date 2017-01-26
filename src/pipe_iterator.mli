@@ -5,7 +5,7 @@
 
     The primary function that enables this is the [copy] function, below. *)
 
-open! Core.Std
+open! Core
 open! Async.Std
 
 type 'a t

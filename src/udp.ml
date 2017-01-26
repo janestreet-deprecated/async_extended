@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 module Socket = Socket
 
@@ -29,7 +29,7 @@ end = struct
     | `Closed | `Bad_fd ->
         failwithf "sendto on bad file descriptor %s" (Unix.Fd.to_string fd) ()
     | `Ready ->
-      Core.Std.Unix.sendto (Unix.Fd.file_descr_exn fd) ~buf ~pos ~len ~addr ~mode:[]
+      Core.Unix.sendto (Unix.Fd.file_descr_exn fd) ~buf ~pos ~len ~addr ~mode:[]
   ;;
   *)
 

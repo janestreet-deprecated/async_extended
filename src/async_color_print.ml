@@ -1,5 +1,5 @@
 (* Async-friendly version of Core_extended.Std.Color_print *)
-open Core.Std
+open Core
 module CP = Core_extended.Std.Color_print
 include CP
 

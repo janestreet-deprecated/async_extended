@@ -1,4 +1,4 @@
-(* open Core.Std *)
+(* open Core *)
 open Async.Std
 
 module Stdio_attr = struct
@@ -31,7 +31,7 @@ module Stdio_attr = struct
   let mod_cbreak t = {
     attr_in =
       {
-        t.attr_in with Core.Std.Unix.Terminal_io.
+        t.attr_in with Core.Unix.Terminal_io.
           c_echo = false;
           c_icanon = false;
           c_vmin = 1;
@@ -39,7 +39,7 @@ module Stdio_attr = struct
       };
     attr_out =
       {
-        t.attr_out with Core.Std.Unix.Terminal_io.
+        t.attr_out with Core.Unix.Terminal_io.
           c_echo = false;
           c_icanon = false;
           c_vmin = 1;

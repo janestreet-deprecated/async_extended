@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 module Csv_writer = Core_extended.Csv_writer
 

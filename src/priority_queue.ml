@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 
 (* this type is the result of a very particular ordering desire.  All high priority

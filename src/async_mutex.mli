@@ -8,7 +8,7 @@
     Rather than use a mutex, one common idiom is to use a [Sequencer] to guarantee one
     client at a time has access to a shared piece of state. *)
 
-open! Core.Std
+open! Core
 open! Async.Std
 
 type t

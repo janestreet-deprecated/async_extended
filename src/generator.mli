@@ -3,7 +3,7 @@
  *  that both invoke [next], then they will see different sequences of items *)
 
 
-open! Core.Std
+open! Core
 open! Async.Std
 
 type 'a t

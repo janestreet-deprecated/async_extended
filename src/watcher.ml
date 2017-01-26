@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 
 let create ?start_on ~check_interval ~change_interval on_failure =

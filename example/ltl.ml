@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 open Async_extended.Std
 
 (* Also see the tech blog post titled "Linear temporal logic for queries and

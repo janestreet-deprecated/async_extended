@@ -2,7 +2,7 @@
     between clients and servers. *)
 
 open! Core
-open! Async.Std
+open! Async
 
 type t
 

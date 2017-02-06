@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 module Exit_or_signal_or_stop = Unix.Exit_or_signal_or_stop
 module Fd = Unix.Fd

@@ -7,7 +7,7 @@
 *)
 
 open! Core
-open! Async.Std
+open! Async
 
 (** [udp_server addr port f] except that f is called on every packet received with the
     address it was received from and the data received. The next packet will not be read
@@ -25,7 +25,7 @@ val udp_client : addr:string
 
 (** [connect socket_type ~addr] connects a socket to addr *)
 val connect :
-  ([< `Inet of Async.Std.Unix.Inet_addr.t * int | `Unix of string ] as 'a)
+  ([< `Inet of Async.Unix.Inet_addr.t * int | `Unix of string ] as 'a)
     Socket.Type.t
   -> addr:'a
   -> ([ `Active ], 'a) Socket.t Deferred.t

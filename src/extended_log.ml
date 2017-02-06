@@ -1,6 +1,6 @@
 open Core
 open Textutils.Std
-open Async.Std
+open Async
 
 module Console = struct
   module Ansi = Console.Ansi

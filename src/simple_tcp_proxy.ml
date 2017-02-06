@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 type t =
   { mutable ok_client_to_server : unit Ivar.t

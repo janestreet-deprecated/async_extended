@@ -1,4 +1,4 @@
-include Async.Std.Shutdown
+include Async.Shutdown
 
 let deprecated_shutdown_and_raise ?force status =
   shutdown ?force status;

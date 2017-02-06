@@ -1,7 +1,7 @@
 (* Extraction and running of scripts embedded inside an executable. *)
 
 open! Core
-open! Async.Std
+open! Async
 
 val run : script_name:string
   -> args:string list

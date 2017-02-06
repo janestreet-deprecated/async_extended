@@ -4,7 +4,7 @@
 
 
 open! Core
-open! Async.Std
+open! Async
 
 type 'a t
 

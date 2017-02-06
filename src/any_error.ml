@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 type ('ok, 'err) t = ('ok, 'err) Deferred.Result.t
 

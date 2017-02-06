@@ -1,5 +1,5 @@
 open! Core
-open! Async.Std
+open! Async
 
 (** A variant of [Deferred.Result.t] with "any error" semantics. When multiple deferred
     values that each may be an error are combined, the result may fail with any of the

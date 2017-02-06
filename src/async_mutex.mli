@@ -9,7 +9,7 @@
     client at a time has access to a shared piece of state. *)
 
 open! Core
-open! Async.Std
+open! Async
 
 type t
 

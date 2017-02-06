@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 (* The algorithm idea is as follows. Define
 

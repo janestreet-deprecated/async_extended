@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 module Csv_writer = Core_extended.Csv_writer
 
 (* the maximum read/write I managed to get off of a socket or disk was 65k *)

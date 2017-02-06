@@ -1,7 +1,7 @@
 open! Core
-open! Async.Std
+open! Async
 
-include module type of Async.Std.Shutdown
+include module type of Async.Shutdown
 
 (** [deprecated_shutdown_and_raise ?force status] initiates shutdown and immediately
     raises. *)

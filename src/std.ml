@@ -21,7 +21,7 @@ module Interactive            = Async_interactive
   [@@deprecated "[since 2016-08] Use the standalone Async_interactive library instead"]
 module Keyed_sequencer        = Keyed_sequencer
 module Log = struct
-  include Async.Std.Log
+  include Async.Log
   include Extended_log
 end
 module Ltl                    = Ltl
@@ -31,7 +31,7 @@ module Pipe_zipper            = Pipe_zipper
 module Priority_queue         = Priority_queue
 module Process                = Process
 module Reader = struct
-  include Async.Std.Reader
+  include Async.Reader
   include Reader_ext
 end
 module Semaphore              = Semaphore

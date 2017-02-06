@@ -1,5 +1,5 @@
 open! Core
-open! Async.Std
+open! Async
 
 module Update : sig
   type 'a t =

@@ -5,7 +5,7 @@
     See lib/async_extended/example/run_in_fork.ml for an example.
 *)
 open Core
-open Async.Std
+open Async
 
 (** [run_in_fork] forks and then runs [f] in the child process, and then writes the result
     back to the parent process over a unix pipe. Note that [f] cannot contain any async

@@ -1,6 +1,6 @@
 open Core
 module Process_in_this_dir = Process
-open Async.Std
+open Async
 module Process = Process_in_this_dir
 
 include Reader

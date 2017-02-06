@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 module Throttle_and_count : sig
   type t

@@ -1,5 +1,5 @@
 open! Core
-open! Async.Std
+open! Async
 
 (** An applicative interface for parsing values from a csv file. *)
 

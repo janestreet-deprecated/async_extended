@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 type t = {
   mutable is_locked : bool;

@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 let create ?start_on ~check_interval ~change_interval on_failure =
   let world = ref 0 in

@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 module Cached_data = struct
   type 'a t =

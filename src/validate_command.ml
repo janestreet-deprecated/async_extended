@@ -1,5 +1,5 @@
 open! Core
-open Async.Std
+open Async
 open Command.Let_syntax
 
 module type S = sig

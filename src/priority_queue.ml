@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 
 (* this type is the result of a very particular ordering desire.  All high priority
    items should come off the queue before all low priority items, but items should be

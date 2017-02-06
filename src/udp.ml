@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 module Socket = Socket
 
 module Udp_socket : sig

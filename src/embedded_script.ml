@@ -2,7 +2,7 @@
 
 open Core
 module Process_in_this_dir = Process
-open Async.Std
+open Async
 module Process = Process_in_this_dir
 
 let section_name ~script_name = ".jane." ^ script_name

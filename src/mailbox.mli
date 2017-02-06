@@ -1,5 +1,5 @@
 open! Core
-open! Async.Std
+open! Async
 
 (** Erlang style mailboxes built on top of async streams *)
 type 'a t [@@deriving sexp_of]

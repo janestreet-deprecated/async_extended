@@ -3,7 +3,7 @@ open Core
 module CP = Core_extended.Std.Color_print
 include CP
 
-let print_string = Async.Std.print_string
+let print_string = Async.print_string
 
 let bold_printf ?override = ksprintf (fun s -> print_string (CP.bold ?override s))
 let underline_printf ?override = ksprintf (fun s -> print_string (CP.underline ?override s))

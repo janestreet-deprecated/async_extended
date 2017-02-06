@@ -1,5 +1,5 @@
 open! Core
-open Async.Std
+open Async
 module Find = Async_extended.Std.Find
 
 let main path =

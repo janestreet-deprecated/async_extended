@@ -1,5 +1,5 @@
 open! Core
-open! Async.Std
+open! Async
 
 (* A Signal is a broadcast communication mechanism useful for event-based and
 functional reactive programming that combines Synccasts with duplicate handling

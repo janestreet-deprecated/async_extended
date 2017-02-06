@@ -1,6 +1,6 @@
 
 open Core
-open Async.Std
+open Async
 
 type t = {
   name: string;

@@ -48,7 +48,7 @@ let resource t =
     ~release:(fun () -> incr t; return ())
 
 let%test_module _ = (module struct
-  let stabilize = Async_kernel.Scheduler.run_cycles_until_no_jobs_remain
+  let stabilize = Async_kernel_private.Scheduler.run_cycles_until_no_jobs_remain
 
   (* check if we go to sleep on negative counts *)
   let%test_unit _ =

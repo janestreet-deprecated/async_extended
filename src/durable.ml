@@ -76,7 +76,7 @@ let with_ t ~f =
 
 let%test_module _ = (module struct
 
-  let go () = Async_kernel.Scheduler.run_cycles_until_no_jobs_remain ()
+  let go () = Async_kernel_private.Scheduler.run_cycles_until_no_jobs_remain ()
 
   let create_counter = ref 0
   let fix_counter = ref 0

@@ -23,7 +23,7 @@
    [a] begins before [b] and [a] ends after [b]
 *)
 open! Core
-open! Async_kernel.Std
+open! Async_kernel
 
 module Raw : sig
   (**

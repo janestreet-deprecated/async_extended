@@ -183,7 +183,7 @@ let%test_module _ = (module struct
 
   let res_return = return
 
-  open Async_kernel.Std
+  open Async_kernel
   open Async_unix.Std
 
   let expect_fail resource =

@@ -5,3 +5,5 @@
     async_extended
     core
     pcre))))
+
+(jbuild_version jane_street)

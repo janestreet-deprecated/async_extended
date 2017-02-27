@@ -671,7 +671,16 @@ module Builder = struct
     let rec transform : type a. a t -> a Without_headers.t = function
       | Return x -> Without_headers.Return x
       | Column i -> Without_headers.Column i
-      | Header h -> Without_headers.Column (String.Map.find_exn header_map h)
+      | Header h ->
+        let column_index =
+          match String.Map.find_exn header_map h with
+          | index -> index
+          | exception Not_found ->
+            raise_s [%message "Header not found"
+                                (h : string)
+                                (header_map : int String.Map.t)]
+        in
+        Without_headers.Column column_index
       | Apply (f, x) -> Without_headers.Apply (transform f, transform x)
       | Map (f, x) -> Without_headers.Map (f, transform x)
       | Map2 (f, x, y) -> Without_headers.Map2 (f, transform x, transform y)

@@ -11,8 +11,9 @@ module Header = struct
     | `Yes
     | `Limit of string list
     | `Replace of string list
-    | `Transform of (string list -> string list)
-    | `Add of string list ]
+    | `Transform of (string list -> string list) sexp_opaque
+    | `Add of string list
+  ] [@@deriving sexp_of]
 end
 
 module Row = struct

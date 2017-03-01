@@ -126,7 +126,7 @@ let create_fds'
         Unix.dup2 ~src:stdin ~dst:Unix.stdin;
         Unix.dup2 ~src:stdout ~dst:Unix.stdout;
         Unix.dup2 ~src:stderr ~dst:Unix.stderr;
-        never_returns (Unix.exec ?env ~prog ~args:(prog :: args) ());
+        never_returns (Unix.exec ?env ~prog ~argv:(prog :: args) ());
       with
       | _ ->
         Core.Printf.eprintf "exec failed: %s\n%!" prog;

@@ -182,8 +182,9 @@ module Parse_state : sig
     -> unit
     -> 'a t
 
-  (** [input t ?len s] parses the first [len] characters (default: all) of [s]. *)
-  val input : 'a t -> ?len : int -> string -> 'a t
+  (** [input t ?pos ?len s] parses the first [len] characters of [s], starting at position
+      [pos].  [pos] defaults to [0] and [len] defaults to reading up to the end of [s]. *)
+  val input : 'a t -> ?pos : int -> ?len : int -> string -> 'a t
 
   (** [finish t] forces an end-of-row. Raises if end-of-row is not permitted here (e.g.,
       within a quoted field). It is permitted to [input] after a [finish]. *)
@@ -213,4 +214,35 @@ module Replace_delimited_csv : sig
 
   end
 
+end
+
+val create_parse_state
+  :  ?strip : bool
+  -> ?sep : char
+  -> ?quote:[ `No_quoting | `Using of char]
+  -> ?on_invalid_row:'a on_invalid_row
+  -> header_map:int String.Map.t
+  -> 'a t
+  -> init:'b
+  -> f:('b -> 'a -> 'b)
+  -> 'b Parse_state.t
+
+module Header_parse : sig
+  (** Type [t] represents an incomplete header parse. Keep calling [input] on it until you
+      get a map from header name to column number. *)
+  type t
+
+  val create
+    :  ?strip : bool
+    -> ?sep : char
+    -> ?quote : [ `No_quoting | `Using of char ]
+    -> ?header : Header.t
+    -> _ Builder.t
+    -> (t, int String.Map.t) Either.t
+
+  (** [input t ~len s] reads the first [len] bytes from [s] and returns either [t] or
+      [header_map, unused_input]. *)
+  val input : t -> len : int -> string -> (t, int String.Map.t * string) Either.t
+
+  val is_at_beginning_of_row : t -> bool
 end

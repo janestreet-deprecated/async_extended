@@ -351,7 +351,7 @@ module Parse_state = struct
       && array.(next_field_index) = current_field
   ;;
 
-  let input t ?len input =
+  let input t ?(pos = 0) ?len input =
     let (field, current_row) = mutable_of_t t in
     let enqueue = ref (should_enqueue t.fields_used t.current_field t.next_field_index) in
     let current_field = ref t.current_field in
@@ -366,9 +366,10 @@ module Parse_state = struct
       next_field_index := 0;
       enqueue := should_enqueue t.fields_used !current_field !next_field_index
     in
-    let loop_bound = match len with
-      | Some i -> i
-      | None -> String.length input
+    let loop_bound =
+      match len with
+      | Some i -> i + pos
+      | None   -> String.length input
     in
     let rec loop i t step =
       if i >= loop_bound
@@ -468,7 +469,7 @@ module Parse_state = struct
               failwithf "In_quoted_field_after_quote looking at '%c' (lineno=%d)"
                 c (t.lineno) ()
     in
-    let t' = loop 0 t t.step in
+    let t' = loop pos t t.step in
     { t' with
       field = Buffer.contents field
     ; current_row = Fast_queue.to_list current_row
@@ -787,7 +788,7 @@ end = struct
 end
 
 let create_parse_state
-      ?strip ?sep ?quote ?(on_invalid_row=On_invalid_row.raise) header_map builder ~init ~f =
+      ?strip ?sep ?quote ?(on_invalid_row=On_invalid_row.raise) ~header_map builder ~init ~f =
   let (row_to_'a, fields_used) = Builder.build ~header_map builder in
   let f _offset init row =
     try f init (row_to_'a row) with exn ->
@@ -829,7 +830,7 @@ let fold_reader' ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder 
         ?strip
         ?sep ?quote
         ?on_invalid_row
-        header_map
+        ~header_map
         builder
         ~init:(Queue.create ())
         ~f:(fun queue elt -> Queue.enqueue queue elt; queue)
@@ -902,7 +903,7 @@ let fold_string ?strip ?sep ?quote ?header ?on_invalid_row builder ~init ~f csv_
     init
   | Some (header_map, csv_string) ->
     Parse_state.input
-      (create_parse_state ?strip ?sep ?quote ?on_invalid_row header_map builder ~init ~f)
+      (create_parse_state ?strip ?sep ?quote ?on_invalid_row ~header_map builder ~init ~f)
       csv_string
     |> Parse_state.finish
     |> Parse_state.acc

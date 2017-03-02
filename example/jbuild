@@ -4,6 +4,7 @@
     async
     async_extended
     core
-    pcre))))
+    pcre))
+  (preprocess (pps (ppx_jane)))))
 
 (jbuild_version jane_street)

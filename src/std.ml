@@ -36,7 +36,6 @@ module Reader = struct
 end
 module Semaphore              = Semaphore
 module Shell                  = Async_shell
-module Shutdown               = Shutdown
 module Simple_tcp_proxy       = Simple_tcp_proxy
 module Sound                  = Sound
 module Udp                    = Udp

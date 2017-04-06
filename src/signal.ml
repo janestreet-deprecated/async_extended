@@ -61,7 +61,7 @@ let create_repeater ?randomize ?stop_condition span =
     let span =
       match randomize with
       | None -> span
-      | Some percent -> Time.Span.randomize ~percent span
+      | Some percent -> Time.Span.randomize ~percent:(Percent.of_mult percent) span
     in
     Deferred.upon (Clock.after span) (fun () ->
       send repeater (Scheduler.cycle_start ());

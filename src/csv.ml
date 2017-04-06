@@ -1005,7 +1005,7 @@ module Replace_delimited_csv = struct
     type ('a,'b) reader = ('a, 'b) Delimited.reader
 
     let upgrade_delimited_row_pipe r =
-      Pipe.fold_map r ~init:None ~f:(fun header_map row ->
+      Pipe.folding_map r ~init:None ~f:(fun header_map row ->
         let row = Row.upgrade ?header_map row in
         (Some (Row.header_map row), row))
     ;;

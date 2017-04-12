@@ -1,5 +1,5 @@
 open! Core
-open Textutils.Std
+open Textutils
 open! Async
 
 module Console : sig

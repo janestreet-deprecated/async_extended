@@ -23,7 +23,7 @@ module Console = struct
         ?(info=([] :> Ansi.attr list))
         ?(error=([`Red] :> Ansi.attr list))
         writer =
-    Log.Output.create (fun msgs ->
+    Log.Output.create ~flush:(fun () -> return ()) (fun msgs ->
        Queue.iter msgs ~f:(fun msg ->
          with_style ~debug ~info ~error msg
          |> (fun styled_msg ->
@@ -77,6 +77,7 @@ module Syslog = struct
       Ivar.read d
     in
     Log.Output.create
+      ~flush:(fun () -> return ())
       (fun msgs ->
         ready >>= fun () ->
         In_thread.run (fun () ->

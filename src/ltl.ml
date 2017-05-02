@@ -653,7 +653,7 @@ module Make (State: State) = struct
          [always (t1 || t2)]
          where both t1 and t2 evaluate to true.
       *)
-      |> List.dedup ~compare
+      |> List.dedup_and_sort ~compare
 
     let no_change_unless (t, values) =
       (* [false_unless t = Some l] means [l] is a minimal set of guards such that
@@ -724,7 +724,7 @@ module Make (State: State) = struct
     let to_list t =
       Hashtbl.data t.sleeping
       |> List.concat_map ~f:Set.to_list
-      |> List.dedup ~compare:Constraint.compare
+      |> List.dedup_and_sort ~compare:Constraint.compare
 
     let num_guards t =
       Hashtbl.length t.sleeping
@@ -764,7 +764,7 @@ module Make (State: State) = struct
           let constraints = Hashtbl.find t.sleeping guard in
           constraints)
         |> List.concat_map ~f:Set.to_list
-        |> List.dedup ~compare:Constraint.compare
+        |> List.dedup_and_sort ~compare:Constraint.compare
       in
       List.iter constraints ~f:(remove t);
       constraints
@@ -1188,14 +1188,14 @@ let%test_module _ = (module struct
 
   (* Test both against the naive semantics and the manual result. *)
   let test_one ?expect ?(skip_naive = false) t variables data =
-    let values = List.filter_opt (List.dedup (List.map data ~f:snd)) in
+    let values = List.filter_opt (List.dedup_and_sort (List.map data ~f:snd)) in
     query_list t data
     >>| fun result ->
     let result =
       List.concat_map result ~f:(fun assignment ->
         let assignment = Assignment.bindings assignment in
         Assignment.all ~refines:assignment variables values)
-      |> List.dedup ~compare:Assignment.compare
+      |> List.dedup_and_sort ~compare:Assignment.compare
       |> List.sort ~cmp:Assignment.compare
     in
     if not skip_naive

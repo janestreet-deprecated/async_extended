@@ -535,14 +535,14 @@ module Make (State: State) = struct
           Field.compare_values field1 value1 value2
 
       let hash (Eq (field, value)) =
-        Hashtbl.hash (Type_equal.Id.hash field.id, field.hashable.hash value)
+        [%hash: int * int] (Type_equal.Id.hash field.id, field.hashable.hash value)
 
       let t_of_sexp _ =
         failwith "Guard.t_of_sexp undefined"
     end
 
     include T
-    include Hashable.Make (T)
+    include Hashable.Make_and_derive_hash_fold_t (T)
   end
 
   module Constraint : sig

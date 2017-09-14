@@ -747,10 +747,12 @@ end = struct
                              (builder_headers : String.Set.t)
                              (limit_headers : String.Set.t)];
     let csv_headers = String.Set.of_array csv_headers' in
-    if not (Set.is_subset limit_headers ~of_:csv_headers)
+    let missing = Set.diff limit_headers csv_headers in
+    if not (Set.is_empty missing)
     then raise_s [%message "Header specified in `Limit not present in csv document"
                              (limit_headers : String.Set.t)
-                             (csv_headers : String.Set.t)];
+                             (csv_headers : String.Set.t)
+                             (missing : String.Set.t)];
     header_map csv_headers'
   ;;
 

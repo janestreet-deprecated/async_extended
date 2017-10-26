@@ -67,6 +67,7 @@ module Header = struct
     | `Limit of string list
     | `Replace of string list
     | `Transform of (string list -> string list)
+    | `Filter_map of (string list -> string option list) sexp_opaque
     | `Add of string list
   ] [@@deriving sexp]
 end
@@ -779,6 +780,15 @@ end = struct
     | `Transform f     ->
       let f headers = header_map (Array.of_list (f (Array.to_list headers))) in
       First (create' ?strip ?sep ?quote f)
+    | `Filter_map f     ->
+      let f headers =
+        f (Array.to_list headers)
+        |> List.foldi ~init:String.Map.empty ~f:(fun i map ->
+          function
+          | None -> map
+          | Some header -> Map.add map ~key:header ~data:i)
+      in
+      First (create' ?strip ?sep ?quote f)
   ;;
 
   let input t ~len input =
@@ -1007,7 +1017,7 @@ module Replace_delimited_csv = struct
     type ('a,'b) reader = ('a, 'b) Delimited.reader
 
     let upgrade_delimited_row_pipe r =
-      Pipe.folding_map r ~init:None ~f:(fun header_map row ->
+      Pipe.fold_map r ~init:None ~f:(fun header_map row ->
         let row = Row.upgrade ?header_map row in
         (Some (Row.header_map row), row))
     ;;

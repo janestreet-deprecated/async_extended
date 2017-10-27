@@ -751,3 +751,18 @@ let%test_unit "parse_string headers" =
   | _ ->
     failwithf "unexpected number of rows %d, expected 1" (List.length rows) ()
 ;;
+
+let%test_unit "parse_string filter_map" =
+  let header = `Filter_map (List.map ~f:(function
+    | "" -> None
+    | s -> Some (String.uppercase s)))
+  in
+  let rows = Csv.parse_string ~sep:',' ~header "foo,,,,bar\nalpha,1,2,3,beta" in
+  match rows with
+  | [ row ] ->
+    [%test_result: string option] ~expect:(Some "ALPHA") (Row.get row "foo");
+    [%test_result: string option] ~expect:(Some "BETA") (Row.get row "bar");
+    [%test_result: string option] ~expect:None (Row.get row "")
+  | _ ->
+    failwithf "unexpected number of rows %d, expected 1" (List.length rows) ()
+;;

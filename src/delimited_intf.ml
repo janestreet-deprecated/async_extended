@@ -20,6 +20,9 @@ module type Header = sig
     (* the supplied transform function will be passed the headers as they are in the file
        and should return the headers it would like to use. *)
     | `Transform of (string list -> string list) sexp_opaque
+    (* Like [`Transform] except any headers that are unused can be converted to
+       [None] *)
+    | `Filter_map of (string list -> string option list) sexp_opaque
   ] [@@deriving sexp_of]
 end
 

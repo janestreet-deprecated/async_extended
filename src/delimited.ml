@@ -12,6 +12,7 @@ module Header = struct
     | `Limit of string list
     | `Replace of string list
     | `Transform of (string list -> string list) sexp_opaque
+    | `Filter_map of (string list -> string option list) sexp_opaque
     | `Add of string list
   ] [@@deriving sexp_of]
 end
@@ -252,24 +253,27 @@ let make_emit_field ~strip current_row field =
 
 let set_headers header_index headers =
   List.iteri headers ~f:(fun i h ->
-    match Hashtbl.find header_index h with
-    | None -> Hashtbl.set header_index ~key:h ~data:i
-    | Some other_i ->
-      failwithf "header %s duplicated at position %i and %i" h other_i i ())
+    match h with
+    | None -> ()
+    | Some h ->
+      match Hashtbl.find header_index h with
+      | None -> Hashtbl.set header_index ~key:h ~data:i
+      | Some other_i ->
+        failwithf "header %s duplicated at position %i and %i" h other_i i ())
 ;;
 
 let make_emit_row current_row row_queue header ~lineno =
   let module Table = String.Table in
   let header_index =
     match (header : Header.t) with
-    | `No | `Yes | `Limit _ | `Transform _ -> Table.create () ~size:1
+    | `No | `Yes | `Limit _ | `Transform _ | `Filter_map _ -> Table.create () ~size:1
     | `Replace headers | `Add headers ->
       Table.of_alist_exn (List.mapi headers ~f:(fun i s -> (s,i)))
   in
   let header_processed =
     ref (match header with
     | `No | `Add _ -> true
-    | `Limit _ | `Replace _ | `Transform _ | `Yes -> false)
+    | `Limit _ | `Replace _ | `Transform _ | `Filter_map _ | `Yes -> false)
   in
   (fun () ->
     if not !header_processed then begin
@@ -287,8 +291,10 @@ let make_emit_row current_row row_queue header ~lineno =
             Hashtbl.set header_index ~key:must_exist ~data:i)
       | `Replace _new_headers -> ()  (* already set above *)
       | `Transform f ->
+        set_headers header_index (List.map ~f:Option.some (f (Queue.to_list current_row)))
+      | `Filter_map f ->
         set_headers header_index (f (Queue.to_list current_row))
-      | `Yes -> set_headers header_index (Queue.to_list current_row)
+      | `Yes -> set_headers header_index (List.map ~f:Option.some (Queue.to_list current_row))
     end else begin
       Queue.enqueue row_queue (Row.create header_index current_row)
     end;
@@ -742,6 +748,21 @@ let%test_unit "parse_string headers" =
   | [ row ] ->
     [%test_result: string option] ~expect:(Some "alpha") (Row.get row "foo");
     [%test_result: string option] ~expect:(Some "beta") (Row.get row "bar")
+  | _ ->
+    failwithf "unexpected number of rows %d, expected 1" (List.length rows) ()
+;;
+
+let%test_unit "parse_string filter_map" =
+  let header = `Filter_map (List.map ~f:(function
+    | "" -> None
+    | s -> Some (String.uppercase s)))
+  in
+  let rows = Csv.parse_string ~sep:',' ~header "foo,,,,bar\nalpha,1,2,3,beta" in
+  match rows with
+  | [ row ] ->
+    [%test_result: string option] ~expect:(Some "ALPHA") (Row.get row "foo");
+    [%test_result: string option] ~expect:(Some "BETA") (Row.get row "bar");
+    [%test_result: string option] ~expect:None (Row.get row "")
   | _ ->
     failwithf "unexpected number of rows %d, expected 1" (List.length rows) ()
 ;;

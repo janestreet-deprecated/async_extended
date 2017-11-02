@@ -66,9 +66,9 @@ module Header = struct
     | `No
     | `Limit of string list
     | `Replace of string list
-    | `Transform of (string list -> string list)
+    | `Transform of (string list -> string list) sexp_opaque
     | `Add of string list
-  ] [@@deriving sexp]
+  ] [@@deriving sexp_of]
 end
 
 module Row' : sig
@@ -809,14 +809,15 @@ let fold_reader' ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder 
     | Second header_map ->
       return (Some (header_map, None))
     | First header_parse ->
-      let buffer = String.create buffer_size in
+      let buffer = Bytes.create buffer_size in
       Deferred.repeat_until_finished header_parse (fun header_parse ->
         match%map Reader.read r buffer ~len:buffer_size with
         | `Eof ->
           if Header_parse.is_at_beginning_of_row header_parse
-          then `Finished None
-          else raise_s [%message
-                 "header is incomplete" ~_:([%here] : Source_code_position.t)]
+          then
+            failwith "Header line was not found"
+          else
+            failwith "Header is incomplete"
         | `Ok len ->
           match Header_parse.input header_parse ~len buffer with
           | First header_parse ->
@@ -841,7 +842,7 @@ let fold_reader' ?strip ?skip_lines ?sep ?quote ?header ?on_invalid_row builder 
       Option.fold trailing_input ~init:state ~f:(fun state input ->
         Parse_state.input state input)
     in
-    let buffer = String.create buffer_size in
+    let buffer = Bytes.create buffer_size in
     Deferred.repeat_until_finished (state, init) (fun (state, init) ->
       match%bind Reader.read r buffer ~len:buffer_size with
       | `Eof ->

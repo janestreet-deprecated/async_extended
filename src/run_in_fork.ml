@@ -41,7 +41,7 @@ let in_the_child ~f bin_writer_t writer error_writer =
 let unexpected_eof_error = Error.of_string "Unexpected EOF in pipe from forked process"
 
 module Multiple = struct
-  let in_the_parent ?max_len bin_reader_t reader error_reader =
+  let in_the_parent ?max_len bin_reader_t reader error_reader child_pid =
     let fd = Fd.create Fd.Kind.Fifo reader (Info.of_string "reader") in
     let async_reader = Reader.create fd in
     let error_fd = Fd.create Fd.Kind.Fifo error_reader (Info.of_string "error_reader") in
@@ -63,6 +63,7 @@ module Multiple = struct
       Deferred.all_unit
         [ Reader.close async_reader
         ; Reader.close error_async_reader
+        ; Deferred.ignore (Unix.waitpid child_pid)
         ]
       >>| fun () ->
       `Finished ()
@@ -97,10 +98,10 @@ module Multiple = struct
       Core.Unix.close reader;
       Core.Unix.close error_reader;
       in_the_child ~f bin_t.Bin_prot.Type_class.writer writer writer
-    | `In_the_parent _pid ->
+    | `In_the_parent child_pid ->
       Core.Unix.close writer;
       Core.Unix.close error_writer;
-      in_the_parent ?max_len bin_t.Bin_prot.Type_class.reader reader error_reader
+      in_the_parent ?max_len bin_t.Bin_prot.Type_class.reader reader error_reader child_pid
   ;;
 end
 

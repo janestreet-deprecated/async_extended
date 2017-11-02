@@ -10,6 +10,7 @@
     command_rpc
     core
     core_extended
+    expect_test_helpers
     textutils
   ))
   (preprocess (pps (ppx_jane ppx_driver.runner)))

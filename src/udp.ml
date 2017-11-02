@@ -111,7 +111,7 @@ let udp_server ~addr ~port ~f =
       Socket.bind sock addr >>= fun sock ->
       Ivar.fill server_ready ();
       let buf_len = 65535 in
-      let buf = String.create buf_len in
+      let buf = Bytes.create buf_len in
       let rec receive_loop () =
         (Udp_socket.recvfrom sock ~buf ~pos:0 ~len:buf_len >>| fun (len,addr) ->
         (addr, String.sub buf ~pos:0 ~len)) >>> fun (addr,data) ->

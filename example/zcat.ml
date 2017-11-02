@@ -3,7 +3,7 @@ open Async
 open Async_extended.Std
 
 let main file () =
-  let buf = String.create 1024 in
+  let buf = Bytes.create 1024 in
   let finished = Ivar.create () in
   let stdout = Lazy.force Writer.stdout in
   Reader.with_gzip_file file ~f:(fun reader ->

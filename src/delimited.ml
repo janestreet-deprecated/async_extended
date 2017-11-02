@@ -268,32 +268,36 @@ let make_emit_row current_row row_queue header ~lineno =
   in
   let header_processed =
     ref (match header with
-    | `No | `Add _ -> true
-    | `Limit _ | `Replace _ | `Transform _ | `Yes -> false)
+      | `No | `Add _ -> true
+      | `Limit _ | `Replace _ | `Transform _ | `Yes -> false)
   in
+  (`on_eof (fun () ->
+     if not !header_processed
+     then
+       failwith "Header line was not found")),
   (fun () ->
-    if not !header_processed then begin
-      header_processed := true;
-      match header with
-      | `No | `Add _ -> assert false
-      | `Limit at_least ->
-        let headers = Queue.to_list current_row in
-        List.iter at_least ~f:(fun must_exist ->
-          match List.findi headers ~f:(fun _ h -> h = must_exist) with
-          | None ->
-            failwithf "The required header '%s' was not found in '%s' (lineno=%d)"
-              must_exist (String.concat ~sep:"," headers) (!lineno) ()
-          | Some (i, _) ->
-            Hashtbl.set header_index ~key:must_exist ~data:i)
-      | `Replace _new_headers -> ()  (* already set above *)
-      | `Transform f ->
-        set_headers header_index (f (Queue.to_list current_row))
-      | `Yes -> set_headers header_index (Queue.to_list current_row)
-    end else begin
-      Queue.enqueue row_queue (Row.create header_index current_row)
-    end;
-    lineno := !lineno + 1;
-    Queue.clear current_row)
+     if not !header_processed then begin
+       header_processed := true;
+       match header with
+       | `No | `Add _ -> assert false
+       | `Limit at_least ->
+         let headers = Queue.to_list current_row in
+         List.iter at_least ~f:(fun must_exist ->
+           match List.findi headers ~f:(fun _ h -> h = must_exist) with
+           | None ->
+             failwithf "The required header '%s' was not found in '%s' (lineno=%d)"
+               must_exist (String.concat ~sep:"," headers) (!lineno) ()
+           | Some (i, _) ->
+             Hashtbl.set header_index ~key:must_exist ~data:i)
+       | `Replace _new_headers -> ()  (* already set above *)
+       | `Transform f ->
+         set_headers header_index (f (Queue.to_list current_row))
+       | `Yes -> set_headers header_index (Queue.to_list current_row)
+     end else begin
+       Queue.enqueue row_queue (Row.create header_index current_row)
+     end;
+     lineno := !lineno + 1;
+     Queue.clear current_row)
 ;;
 
 let of_reader
@@ -308,13 +312,13 @@ let of_reader
   assert (quote <> sep);
   let lineno        = ref 1 in
   let pipe_r,pipe_w = Pipe.create () in
-  let buffer        = String.create buffer_size in
+  let buffer        = Bytes.create buffer_size in
   let field         = Buffer.create 1 in
   let quoted        = ref false in
   let current_row   = Queue.create () in
   let row_queue     = Queue.create () in
   let emit_field    = make_emit_field ~strip current_row field in
-  let emit_row      = make_emit_row current_row row_queue header ~lineno in
+  let `on_eof on_eof, emit_row = make_emit_row current_row row_queue header ~lineno in
   let flush_rows () =
     Pipe.transfer_in pipe_w ~from:row_queue
   in
@@ -346,6 +350,7 @@ let of_reader
         emit_field ();
         emit_row ();
       end;
+      on_eof ();
       close ()
     | `Ok n ->
       let res =
@@ -424,7 +429,9 @@ module Csv = struct
     let current_row   = Queue.create () in
     let row_queue     = Queue.create () in
     let emit_field    = make_emit_field ~strip current_row field in
-    let emit_row      = make_emit_row current_row row_queue header ~lineno in
+    let `on_eof on_eof, emit_row =
+      make_emit_row current_row row_queue header ~lineno
+    in
     let flush_rows () =
       let data = Queue.to_list row_queue in
       Queue.clear row_queue;
@@ -432,21 +439,23 @@ module Csv = struct
     in
     stage (function
       | `Eof ->
-        begin match !state with
-        | StartField ->
-          if Queue.length current_row <> 0 then begin
+        begin
+          match !state with
+          | StartField ->
+            if Queue.length current_row <> 0 then begin
+              emit_field ();
+              emit_row ()
+            end;
+          | InUnquotedField
+          | InQuotedFieldAfterQuote ->
             emit_field ();
             emit_row ()
-          end;
-          flush_rows ()
-        | InUnquotedField
-        | InQuotedFieldAfterQuote ->
-          emit_field ();
-          emit_row ();
-          flush_rows ()
-        | InQuotedField ->
-          raise (Bad_csv_formatting (Queue.to_list current_row, Buffer.contents field))
-        end
+          | InQuotedField ->
+            raise (Bad_csv_formatting (Queue.to_list current_row, Buffer.contents field))
+        end;
+        let result = flush_rows () in
+        on_eof ();
+        result
       | `Data (buffer, n) ->
         for i = 0 to n - 1 do
           let c = buffer.[i] in
@@ -524,7 +533,7 @@ module Csv = struct
         ~header
         reader =
     let pipe_r,pipe_w = Pipe.create () in
-    let buffer        = String.create buffer_size in
+    let buffer        = Bytes.create buffer_size in
     let close () =
       Pipe.close pipe_w;
       don't_wait_for (Reader.close reader)
@@ -744,4 +753,14 @@ let%test_unit "parse_string headers" =
     [%test_result: string option] ~expect:(Some "beta") (Row.get row "bar")
   | _ ->
     failwithf "unexpected number of rows %d, expected 1" (List.length rows) ()
+;;
+
+let%expect_test "required header is also required for empty files" =
+  Expect_test_helpers.show_raise (fun () ->
+    Csv.parse_string ~sep:'|' ~header:`Yes "");
+  [%expect {| (raised (Failure "Header line was not found")) |}]
+  >>= fun () ->
+  Expect_test_helpers.show_raise (fun () ->
+    Csv.parse_string ~sep:'|' ~header:(`Limit ["foo"]) "");
+  [%expect {| (raised (Failure "Header line was not found")) |}]
 ;;

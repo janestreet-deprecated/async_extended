@@ -51,6 +51,7 @@ let create ~proxy_listen_port ~server_listen_port =
   let rec proxy_server =
     lazy begin
       Tcp.Server.create (Tcp.on_port proxy_listen_port)
+        ~on_handler_error:`Raise
         (fun addr reader_from_client writer_to_client ->
            let proxy_addr = Socket.Address.Inet.to_host_and_port addr in
            Tcp.with_connection

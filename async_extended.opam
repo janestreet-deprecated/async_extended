@@ -17,6 +17,7 @@ depends: [
   "command_rpc"
   "core"
   "core_extended"
+  "delimited_parsing"
   "expect_test_helpers"
   "ppx_driver"
   "ppx_jane"

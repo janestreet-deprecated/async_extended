@@ -79,7 +79,7 @@ let main () =
 
 let () =
   Command.run
-    (Command.async
+    (Command.async_spec
        Command.Spec.empty
        ~summary:"Do long running fibonacci calcs in a forked process, while \n\
                  ticking every second to show we never block the async thread"

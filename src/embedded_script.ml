@@ -37,16 +37,17 @@ let extract_script ~script_name ~into =
     >>= fun writer ->
     bash objdump
     >>= fun (output, status) ->
-    if not (Result.is_ok status) then
+    if not (Result.is_ok status)
+    then
       failwithf "couldn't extract script '%s' from executable '%s': %s"
         script_name myself output.Process.Output.stderr ()
-    else
+    else (
       Writer.write writer output.Process.Output.stdout;
       Writer.close writer
       >>= fun () ->
       Unix.chmod script_path ~perm:0o755
       >>| fun () ->
-      script_path
+      script_path)
 
 
 let run ~script_name ~args ~see_output =

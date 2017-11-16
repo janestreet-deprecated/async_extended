@@ -13,7 +13,7 @@ module Udp_socket : sig
 *)
   val recvfrom
     :  ([ `Bound ], Socket.Address.Inet.t) Socket.t
-    -> buf:string
+    -> buf:Bytes.t
     -> pos:int
     -> len:int
     -> (int * Socket.Address.Inet.t) Deferred.t
@@ -114,7 +114,7 @@ let udp_server ~addr ~port ~f =
       let buf = Bytes.create buf_len in
       let rec receive_loop () =
         (Udp_socket.recvfrom sock ~buf ~pos:0 ~len:buf_len >>| fun (len,addr) ->
-        (addr, String.sub buf ~pos:0 ~len)) >>> fun (addr,data) ->
+        (addr, Bytes.To_string.sub buf ~pos:0 ~len)) >>> fun (addr,data) ->
         f addr data >>>
         receive_loop
       in

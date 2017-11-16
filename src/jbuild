@@ -1,6 +1,7 @@
 (library (
   (name async_extended)
   (public_name async_extended)
+  (flags (:standard -safe-string))
   (libraries (
     async
     async_find

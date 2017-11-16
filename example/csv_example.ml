@@ -48,4 +48,4 @@ let main =
     Pipe.close writer
 ;;
 
-let () = Command.run (Command.async' ~summary main)
+let () = Command.run (Command.async ~summary main)

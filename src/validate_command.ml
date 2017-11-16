@@ -7,7 +7,7 @@ module type S = sig
 end
 
 let create ?(multiple_sexps_per_file=false) ~name s : Command.t =
-  Command.async_or_error' ~summary:(sprintf "Validate %s files" name)
+  Command.async_or_error ~summary:(sprintf "Validate %s files" name)
     [%map_open
       let files = anon (sequence ("FILES" %: file)) in
       fun () ->

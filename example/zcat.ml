@@ -19,7 +19,7 @@ let main file () =
   >>= fun () -> Writer.flushed stdout
 
 let () =
-  Command.async' ~summary:"cat a compressed file"
+  Command.async ~summary:"cat a compressed file"
     (let open Command.Let_syntax in
      let%map_open file = anon ("FILE-NAME" %: file) in
      main file)

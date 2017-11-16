@@ -9,7 +9,7 @@ let main path =
 ;;
 
 let () =
-  Command.async' ~summary:"simple find like tool"
+  Command.async ~summary:"simple find like tool"
     (let open Command.Let_syntax in
      let%map_open
        path = anon ("PATH" %: file)

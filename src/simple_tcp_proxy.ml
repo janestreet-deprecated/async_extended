@@ -50,12 +50,13 @@ let transfer_data t
 let create ~proxy_listen_port ~server_listen_port =
   let rec proxy_server =
     lazy begin
-      Tcp.Server.create (Tcp.on_port proxy_listen_port)
+      Tcp.Server.create (Tcp.Where_to_listen.of_port proxy_listen_port)
         ~on_handler_error:`Raise
         (fun addr reader_from_client writer_to_client ->
            let proxy_addr = Socket.Address.Inet.to_host_and_port addr in
            Tcp.with_connection
-             (Tcp.to_host_and_port (Host_and_port.host proxy_addr) server_listen_port)
+             (Tcp.Where_to_connect.of_host_and_port
+                {host = Host_and_port.host proxy_addr; port = server_listen_port})
              (fun _sock reader_from_server writer_to_server ->
                 force t >>= fun t ->
                 transfer_data t

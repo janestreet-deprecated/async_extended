@@ -28,7 +28,7 @@ type ('a, 'b) t =
 
 let create ~add_to_cache ~to_remove ~hashable ?on_exn ?(cache_errors=false)
     ?remove_if_unread_for ?max_cached_data_age ?max_total_concurrent_jobs () =
-  { cache = Hashtbl.create ~hashable ()
+  { cache = Hashtbl.Using_hashable.create ~hashable ()
   ; sequencer = Keyed_sequencer.create ~hashable ?on_exn ?max_total_concurrent_jobs ()
   ; cache_errors
   ; add_to_cache

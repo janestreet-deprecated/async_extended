@@ -24,7 +24,7 @@ module Raw = struct
 
     let%test_module _ = (module struct
       let%test_unit "check calls alert" =
-        Async_unix.Std.Thread_safe.block_on_async_exn (fun () ->
+        Async_unix.Thread_safe.block_on_async_exn (fun () ->
           let alerted = ref false in
           let _ = check ~alert:(fun () -> alerted := true) noop in
           Gc.compact ();
@@ -34,7 +34,7 @@ module Raw = struct
         )
 
       let%test_unit "check doesn't call alert" =
-        Async_unix.Std.Thread_safe.block_on_async_exn (fun () ->
+        Async_unix.Thread_safe.block_on_async_exn (fun () ->
           let alerted = ref false in
           let _ =
             let h = check ~alert:(fun () -> alerted := true) noop in
@@ -184,7 +184,7 @@ let%test_module _ = (module struct
   let res_return = return
 
   open Async_kernel
-  open Async_unix.Std
+  open Async_unix
 
   let expect_fail resource =
     acquire resource

@@ -50,7 +50,7 @@ let create ~hashable ?on_exn ?max_total_concurrent_jobs () =
   { shared_throttle =
       Option.map max_total_concurrent_jobs ~f:(fun max_concurrent_jobs ->
         Throttle_and_count.create ~max_concurrent_jobs)
-  ; sequencers =  Hashtbl.create ~hashable ()
+  ; sequencers =  Hashtbl.Using_hashable.create ~hashable ()
   ; on_exn
   }
 

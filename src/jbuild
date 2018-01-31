@@ -13,6 +13,7 @@
     core_extended
     delimited_parsing
     expect_test_helpers
+    sequencer_table
     textutils
   ))
   (preprocess (pps (ppx_jane ppx_driver.runner)))

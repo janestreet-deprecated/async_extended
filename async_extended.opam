@@ -21,6 +21,7 @@ depends: [
   "expect_test_helpers"
   "ppx_driver"
   "ppx_jane"
+  "sequencer_table"
   "textutils"
   "jbuilder"                {build & >= "1.0+beta12"}
   "ocaml-migrate-parsetree" {>= "0.4"}

@@ -64,16 +64,18 @@ module Syslog = struct
     | Some `Error -> Syslog.Level.ERR
   ;;
 
-  let openlog () =
-    Syslog.openlog ~options:[ Syslog.Open_option.PID; Syslog.Open_option.CONS ] ()
+  let default_options = [ Syslog.Open_option.PID; Syslog.Open_option.CONS ]
+
+  let openlog ?id ?(options = default_options) ?facility () =
+    Syslog.openlog ?id ~options ?facility ()
   ;;
 
-  let output () =
+  let output ?id ?options ?facility () =
     let ready =
       let d = Ivar.create () in
       (* openlog () shouldn't block by default, but In_thread.run's a
          cheap cure for paranoia *)
-      upon (In_thread.run openlog) (fun () -> Ivar.fill d ());
+      upon (In_thread.run (openlog ?id ?options ?facility)) (fun () -> Ivar.fill d ());
       Ivar.read d
     in
     Log.Output.create

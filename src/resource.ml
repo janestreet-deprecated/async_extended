@@ -80,7 +80,7 @@ module Memo (Key : Hashable) = struct
     }
 
   let memo f =
-    let module Sequencer_table = Async_extra.Sequencer_table.Make(Key) in
+    let module Sequencer_table = Sequencer_table.Make(Key) in
     let table : ('a entry, unit) Sequencer_table.t = Sequencer_table.create () in
     fun key ->
       let create_handle () =

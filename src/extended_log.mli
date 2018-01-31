@@ -31,7 +31,12 @@ end
 
 module Syslog : sig
   (** [output ()] return a Log.Output.t for use with Async.Log. *)
-  val output : unit -> Log.Output.t
+  val output
+    :  ?id:string                                    (** default is [Sys.argv.(0)] *)
+    -> ?options:Core.Unix.Syslog.Open_option.t list  (** default is [[PID; CONS]] *)
+    -> ?facility:Core.Unix.Syslog.Facility.t         (** default is [USER] *)
+    -> unit
+    -> Log.Output.t
 
   module Blocking : sig
     val output : unit -> Log.Blocking.Output.t

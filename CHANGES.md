@@ -1,3 +1,7 @@
+## v0.11
+
+Removed [Ref] module.
+
 ## 113.43.00
 
 - Added `Pipe.create_reader`, which is like `Pipe.init`, but has different

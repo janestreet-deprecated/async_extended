@@ -859,7 +859,7 @@ module Make (State: State) = struct
       let cmp t1 t2 =
         Int.compare (priority t1) (priority t2)
       in
-      List.sort ts ~cmp
+      List.sort ts ~compare:cmp
 
     (* This relies on the flattening behaviour of [conj] such that
        [And [And [Eq _; x]; Not_eq _]] does not occur. *)
@@ -1188,7 +1188,7 @@ let%test_module _ = (module struct
 
   (* Test both against the naive semantics and the manual result. *)
   let test_one ?expect ?(skip_naive = false) t variables data =
-    let values = List.filter_opt (List.dedup_and_sort (List.map data ~f:snd)) in
+    let values = List.filter_opt (List.dedup_and_sort (List.map data ~f:snd) ~compare:Poly.compare) in
     query_list t data
     >>| fun result ->
     let result =
@@ -1196,13 +1196,13 @@ let%test_module _ = (module struct
         let assignment = Assignment.bindings assignment in
         Assignment.all ~refines:assignment variables values)
       |> List.dedup_and_sort ~compare:Assignment.compare
-      |> List.sort ~cmp:Assignment.compare
+      |> List.sort ~compare:Assignment.compare
     in
     if not skip_naive
     then begin
       let naive_result =
         Naive.all_solutions t variables values data
-        |> List.sort ~cmp:Assignment.compare
+        |> List.sort ~compare:Assignment.compare
       in
       [%test_result: Assignment.t list] result ~expect:naive_result;
     end;

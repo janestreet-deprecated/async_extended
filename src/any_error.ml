@@ -19,7 +19,7 @@ include Applicative.Make2(struct
   let map = `Custom Deferred.Result.map
 end)
 
-let all_ignore ts = Deferred.create (fun r ->
+let all_unit ts = Deferred.create (fun r ->
   Deferred.List.iter ~how:`Parallel ts ~f:(fun t ->
     t >>| function
     | Error _ as error -> Ivar.fill_if_empty r error

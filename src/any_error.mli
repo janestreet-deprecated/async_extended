@@ -19,4 +19,4 @@ type ('ok, 'err) t = ('ok, 'err) Deferred.Result.t
 
 include Applicative.S2 with type ('ok, 'err) t := ('ok, 'err) t
 
-val all_ignore : (unit, 'err) t list -> (unit, 'err) t
+val all_unit : (unit, 'err) t list -> (unit, 'err) t

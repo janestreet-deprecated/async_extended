@@ -12,9 +12,12 @@ open! Async
 (** [udp_server addr port f] except that f is called on every packet received with the
     address it was received from and the data received. The next packet will not be read
     until the Deferred returned by f is determined *)
-val udp_server : addr:string
+val udp_server
+  :  ?receive_buffer_size:Byte_units.t
+  -> addr:string
   -> port:int
   -> f:(Socket.Address.Inet.t -> string -> unit Deferred.t)
+  -> unit
   -> unit Deferred.t
 
 (** [udp_client ~addr ~port ~f] Same as tcp_client for udp *)

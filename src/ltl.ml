@@ -641,7 +641,7 @@ module Make (State: State) = struct
         | Weak_now    p -> step p values
         | Delay       p -> [p, values]
         | Until (p, q) as until ->
-          step (q || p && Delay until) values
+          step (q || (p && Delay until)) values
         | Release (p, q) as release ->
           step (q && (p || Delay release)) values
       in
@@ -667,6 +667,7 @@ module Make (State: State) = struct
           List.find_map ts ~f:false_unless
         | Or ts ->
           Option.all (List.map ts ~f:false_unless) |> Option.map ~f:List.concat
+        | False -> Some []
         | _ -> None
       in
       (* [true_unless t = Some l] means [not t => disj l], meaning 't is going to remain
@@ -679,21 +680,23 @@ module Make (State: State) = struct
           List.find_map ts ~f:true_unless
         | And ts ->
           Option.all (List.map ts ~f:true_unless) |> Option.map ~f:List.concat
+        | True -> Some []
         | _ -> None
       in
-      (* [no_change_unless t = Some l] means [l] is a smallest set of guards such that
-         [negate (Guard.eval (disj l) x) => step f x = [f]]
+      (* [no_change_unless t = Some l] means [l] is a smallest set of
+         guards such that [negate (Guard.eval (disj l) x) => step f x = [f]]
       *)
       let rec no_change_unless = function
         | And ts | Or ts ->
           Option.all (List.map ts ~f:no_change_unless)
           |> Option.map ~f:List.concat
-        | Until (True, t) ->
-          (* [eventually t] will not reduce as long as [t] remains [false]. *)
-          false_unless t
-        | Release (False, t) ->
-          (* [always t] will not reduce as long as [t] remains [true]. *)
-          true_unless t
+        | Until (a, b) ->
+          (* [until a b] will not reduce as long as [a] is true and [b] is false *)
+          Option.map2 ~f:(@) (true_unless a) (false_unless b)
+        | Release (a, b) ->
+          (* [release a b] will not reduce as long as [a] is false and [b] is true *)
+          Option.map2 ~f:(@) (false_unless a) (true_unless b)
+        | True -> Some []
         | _ -> None
       in
       no_change_unless t
@@ -732,6 +735,17 @@ module Make (State: State) = struct
     let add t c =
       match Constraint.no_change_unless c with
       | None -> `Not_added
+      | Some [] ->
+        (* Conceptually, it would be fine to put something that is never going
+           to reduce to sleep, because it would be woken up at EOF and the
+           relevant action taken then. However, there are two reasons we don't.
+           The first is that [t] is keyed by the guards themselves, so we need
+           to have a nonzero number of guards in order to actually add
+           something to a [t]. The second is that we want to emit Assignments
+           eagerly, i.e., we would rather keep [(True, _)] active, emit an
+           assignment, and forget about it, rather than wait until the end of
+           time to do so. *)
+        `Not_added
       | Some guards ->
         List.iter guards ~f:(fun ((Guard.Eq (field, _)) as guard) ->
           Hashtbl.update t.sleeping guard ~f:(function

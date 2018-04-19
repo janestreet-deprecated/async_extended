@@ -101,13 +101,18 @@ let using ?buffer_age_limit sock ~f =
 
 let using' ?buffer_age_limit sock ~f = ignore (using ?buffer_age_limit sock ~f)
 
-let udp_server ~addr ~port ~f =
+let udp_server ?receive_buffer_size ~addr ~port ~f () =
   Deferred.create (fun server_ready ->
     Unix.Inet_addr.of_string_or_getbyname addr >>> fun addr ->
     let addr = Socket.Address.Inet.create addr ~port in
     let sock = Socket.create Socket.Type.udp in
     using' sock ~f:(fun _r _w ->
       Socket.setopt sock Socket.Opt.reuseaddr true;
+      begin match receive_buffer_size with
+      | None      -> ()
+      | Some size -> Socket.setopt sock Socket.Opt.rcvbuf
+                       (Int.of_float (Byte_units.bytes size))
+      end;
       Socket.bind sock addr >>= fun sock ->
       Ivar.fill server_ready ();
       let buf_len = 65535 in

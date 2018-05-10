@@ -33,8 +33,8 @@ module Syslog : sig
   (** [output ()] return a Log.Output.t for use with Async.Log. *)
   val output
     :  ?id:string                                    (** default is [Sys.argv.(0)] *)
-    -> ?options:Core.Unix.Syslog.Open_option.t list  (** default is [[PID; CONS]] *)
-    -> ?facility:Core.Unix.Syslog.Facility.t         (** default is [USER] *)
+    -> ?options:Syslog.Open_option.t list  (** default is [[PID; CONS]] *)
+    -> ?facility:Syslog.Facility.t         (** default is [USER] *)
     -> unit
     -> Log.Output.t
 

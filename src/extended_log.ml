@@ -44,7 +44,6 @@ module Console = struct
 end
 
 module Syslog = struct
-  module Syslog = Core.Unix.Syslog
 
   let to_syslog msg =
     let prefix =

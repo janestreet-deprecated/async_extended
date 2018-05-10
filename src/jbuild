@@ -13,6 +13,7 @@
     delimited_parsing
     expect_test_helpers
     sequencer_table
+    core.syslog
     textutils
   ))
   (preprocess (pps (ppx_jane ppxlib.runner)))

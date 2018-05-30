@@ -11,6 +11,7 @@ let of_load ~name load =
     [%map_open
       let files = anon (sequence ("FILES" %: file)) in
       fun () ->
+        let open Deferred.Let_syntax in
         Deferred.Or_error.List.iter files ~f:(fun filename ->
           load filename
           >>| Or_error.ignore)

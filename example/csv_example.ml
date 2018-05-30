@@ -27,6 +27,7 @@ let main =
   let open Command.Let_syntax in
   let%map_open filename = anon ("FILE" %: file) in
   fun () ->
+    let open Deferred.Let_syntax in
     let writer =
       Async_extended.Delimited.Csv.of_writer
         ~line_breaks:`Unix

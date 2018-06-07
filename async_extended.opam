@@ -13,14 +13,11 @@ depends: [
   "async_find"
   "async_inotify"
   "async_interactive"
-  "async_shell"
   "command_rpc"
   "core"
   "core_extended"
-  "delimited_parsing"
   "expect_test_helpers"
   "ppx_jane"
-  "sequencer_table"
   "textutils"
   "jbuilder"                {build & >= "1.0+beta18.1"}
   "ocaml-migrate-parsetree" {>= "1.0"}

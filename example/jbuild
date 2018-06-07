@@ -1,10 +1,11 @@
 (executables
- ((names (find ltl zcat run_in_fork csv_example))
+ ((names (find zcat run_in_fork))
   (libraries (
     async
     async_extended
     core
-    pcre))
+    pcre
+    reader_extended))
   (preprocess (pps (ppx_jane ppxlib.runner)))))
 
 

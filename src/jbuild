@@ -6,13 +6,10 @@
     async_find
     async_inotify
     async_interactive
-    async_shell
     command_rpc
     core
     core_extended
-    delimited_parsing
     expect_test_helpers
-    sequencer_table
     core.syslog
     textutils
   ))

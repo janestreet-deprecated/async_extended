@@ -1,6 +1,7 @@
 open Core
 open Async
-open Async_extended.Std
+
+module Reader = Reader_extended
 
 let main file () =
   let buf = Bytes.create 1024 in
